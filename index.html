@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PedagoSync - Cycle Secondaire</title>
+  <title>PedagoSync - Suivi Qualitatif</title>
   
   <!-- Tailwind CSS pour le design -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,24 +11,25 @@
   <!-- FontAwesome pour les icônes -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- React & Babel pour faire fonctionner l'application dans le navigateur -->
+  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Personnalisation de la barre de défilement */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    /* Styles spécifiques pour les tableaux sur mobile */
+    .table-container { overflow-x: auto; width: 100%; border-radius: 0.75rem; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased">
   
   <div id="root"></div>
 
-  <!-- LE CODE DE L'APPLICATION -->
   <script type="text/babel" data-type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -51,7 +52,7 @@
     const db = getFirestore(app);
     const appId = "sscc-visite-de-classe";
 
-    // --- ICÔNES (Remplacement de Lucide par FontAwesome pour un seul fichier) ---
+    // --- ICÔNES ---
     const Icon = ({ name, size, className }) => <i className={`fas fa-${name} ${className || ''}`} style={size ? { fontSize: size } : {}}></i>;
     const UserCheck = (p) => <Icon name="user-check" {...p} />;
     const Users = (p) => <Icon name="users" {...p} />;
@@ -84,20 +85,49 @@
     const ADMIN_SECRET_PASSWORD = "@1234567890";
     const PERIODES = ["Période 1", "Période 2", "Période 3", "Période 4", "Période 5", "Période 6", "Période 7"];
 
-    const CRITERIA = [
-      { id: 'planification', title: 'I. PLANIFICATION', max: 20, items: [{ label: 'Programmation annuelle disponible et à jour', max: 5 }, { label: 'Fiche de préparation détaillée', max: 5 }, { label: 'Objectifs formulés clairement', max: 5 }, { label: 'Cohérence séance – progression annuelle', max: 5 }] },
-      { id: 'maitrise', title: 'II. MAÎTRISE DISCIPLINAIRE', max: 20, items: [{ label: 'Exactitude scientifique / linguistique', max: 10 }, { label: 'Richesse du contenu et exemples pertinents', max: 5 }, { label: 'Réponses pertinentes aux questions', max: 5 }] },
-      { id: 'demarche', title: 'III. DÉMARCHE PÉDAGOGIQUE', max: 25, items: [{ label: 'Méthodologie adaptée au secondaire', max: 5 }, { label: 'Progression logique de la séance', max: 5 }, { label: 'Diversité des stratégies', max: 5 }, { label: 'Implication des élèves', max: 5 }, { label: 'Vérification des acquis en fin de séance', max: 5 }] },
-      { id: 'gestion', title: 'IV. GESTION DE CLASSE', max: 15, items: [{ label: 'Climat de respect et autorité pédagogique', max: 5 }, { label: 'Gestion du temps', max: 5 }, { label: 'Discipline et organisation', max: 5 }] },
-      { id: 'evaluation', title: 'V. ÉVALUATION ET DIFFÉRENCIATION', max: 20, items: [{ label: 'Questions stimulantes et pertinentes', max: 5 }, { label: 'Adaptation aux différents niveaux', max: 5 }, { label: 'Encouragement et motivation', max: 5 }, { label: 'Feedback constructif', max: 5 }] }
+    // NOUVELLE STRUCTURE D'ÉVALUATION
+    const SECTIONS = [
+      {
+        id: 's1', title: '1️⃣ PRÉPARATION ET ORGANISATION DE LA SÉANCE',
+        options: ['Oui', 'Partiellement', 'Non'],
+        criteria: ['Objectifs clairement annoncés', 'Plan de séance structuré', 'Supports pédagogiques prêts', 'Gestion efficace du temps'],
+        hasComment: true
+      },
+      {
+        id: 's2', title: '2️⃣ MÉTHODOLOGIE PÉDAGOGIQUE',
+        options: ['Excellent', 'Bon', 'À améliorer'],
+        criteria: ['Clarté des explications', 'Progression logique', 'Diversité des méthodes (oral, écrit, numérique…)', 'Questionnement stimulant', 'Adaptation au niveau des élèves'],
+        hasPedagogy: true
+      },
+      {
+        id: 's3', title: '3️⃣ OBSERVATION DU TRAVAIL DES ÉLÈVES',
+        options: ['Très satisfaisant', 'Satisfaisant', 'Insuffisant'],
+        criteria: ['Participation active', 'Concentration', 'Qualité des réponses', 'Autonomie', 'Collaboration entre élèves'],
+        hasEngagement: true
+      },
+      {
+        id: 's4', title: '4️⃣ AMBIANCE ET CLIMAT DE CLASSE',
+        options: ['Très positif', 'Positif', 'À améliorer'],
+        criteria: ['Respect mutuel', 'Autorité bienveillante', 'Gestion des comportements', 'Climat propice à l’apprentissage'],
+        hasRelation: true
+      },
+      {
+        id: 's5', title: '5️⃣ ÉVALUATION ET VÉRIFICATION DES ACQUIS',
+        options: ['Oui', 'Partiellement', 'Non'],
+        criteria: ['Vérification de la compréhension', 'Feedback constructif', 'Correction formative']
+      }
     ];
 
-    const getAppreciation = (score) => {
-      if (score >= 90) return { label: 'Excellent', color: 'text-emerald-600', bg: 'bg-emerald-50' };
-      if (score >= 75) return { label: 'Très satisfaisant', color: 'text-blue-600', bg: 'bg-blue-50' };
-      if (score >= 60) return { label: 'Satisfaisant', color: 'text-amber-600', bg: 'bg-amber-50' };
-      return { label: 'À accompagner', color: 'text-red-600', bg: 'bg-red-50' };
-    };
+    const APPRECIATIONS = [
+      { label: 'Très satisfaisant', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { label: 'Satisfaisant', color: 'text-blue-600', bg: 'bg-blue-50' },
+      { label: 'À consolider', color: 'text-amber-600', bg: 'bg-amber-50' },
+      { label: 'Priorité d’accompagnement', color: 'text-red-600', bg: 'bg-red-50' }
+    ];
+
+    function getAppreciationStyle(label) {
+      return APPRECIATIONS.find(a => a.label === label) || { color: 'text-slate-600', bg: 'bg-slate-100' };
+    }
 
     // --- COMPOSANT PRINCIPAL APP ---
     function App() {
@@ -180,7 +210,7 @@
       const addProfComment = async (ficheId, text) => {
         const fiche = fiches.find(f => f.id === ficheId);
         if(!fiche) return;
-        const newComments = [...fiche.profComments, { text, date: new Date().toLocaleString() }];
+        const newComments = [...(fiche.profComments||[]), { text, date: new Date().toLocaleString() }];
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { profComments: newComments });
         showMsg("Explication transmise.");
       };
@@ -197,7 +227,7 @@
       const addDirectionRemark = async (ficheId, text) => {
         const fiche = fiches.find(f => f.id === ficheId);
         if(!fiche) return;
-        const newRemarks = [...fiche.directionRemarks, { text, date: new Date().toLocaleString() }];
+        const newRemarks = [...(fiche.directionRemarks||[]), { text, date: new Date().toLocaleString() }];
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { directionRemarks: newRemarks });
         showMsg("Remarque enregistrée.");
       };
@@ -233,7 +263,7 @@
           <header className="bg-indigo-800 text-white p-4 shadow-xl flex justify-between items-center sticky top-0 z-40">
             <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
               <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors"><ClipboardList size={24} /></div>
-              <h1 className="text-xl font-black tracking-tighter uppercase italic">Pedago<span className="text-indigo-300">Sync</span> <span className="text-[10px] bg-green-500 px-2 py-0.5 rounded-full not-italic tracking-normal ml-2">Cloud</span></h1>
+              <h1 className="text-xl font-black tracking-tighter uppercase italic">Pedago<span className="text-indigo-300">Sync</span></h1>
             </div>
             <div className="flex items-center gap-5">
               <div className="text-right hidden sm:block">
@@ -270,7 +300,7 @@
       );
     }
 
-    // --- SOUS-COMPOSANTS UI ---
+    // --- PANNEAU ADMIN ---
     function AdminPanel({ users, onUpdateUser, showMsg }) {
       const [editingId, setEditingId] = useState(null);
       const [tempPass, setTempPass] = useState("");
@@ -322,19 +352,58 @@
       );
     }
 
+    // --- PANNEAU RESPONSABLE (Création du NOUVEAU Formulaire) ---
     function ResponsablePanel({ fiches, users, onAddFiche, onOpenFiche }) {
       const [creating, setCreating] = useState(false);
       const [groupBy, setGroupBy] = useState('prof');
-      const [formData, setFormData] = useState({ profId: '', class: '', subject: '', date: new Date().toISOString().split('T')[0], order: 'Période 1', scores: {}, sectionComments: {}, finalComment: '' });
       const profs = users.filter(u => u.role === ROLES.PROF);
-      const total = Object.values(formData.scores).reduce((a, b) => a + (Number(b) || 0), 0);
-      const appreciation = getAppreciation(total);
+      
+      const defaultState = { 
+        profId: '', class: '', subject: '', date: new Date().toISOString().split('T')[0], order: 'Période 1', 
+        evaluations: {}, comments: {}, pedagogyTypes: [], pedagogyOther: '', engagement: '', relation: '',
+        pointsForts: ['', '', ''], axesAmelioration: ['', '', ''],
+        recommandations: { entretien: false, accompagnement: false, formation: false, nouvelleVisite: false, dateVisite: '' },
+        appreciationGlobale: '', commentFinal: '' 
+      };
+      const [formData, setFormData] = useState(defaultState);
+
+      const handleEvalChange = (sectionId, critIndex, field, value) => {
+        setFormData(prev => ({
+          ...prev, 
+          evaluations: {
+            ...prev.evaluations,
+            [`${sectionId}_${critIndex}`]: { ...prev.evaluations[`${sectionId}_${critIndex}`], [field]: value }
+          }
+        }));
+      };
+
+      const handlePedagogyToggle = (type) => {
+        setFormData(prev => {
+          const types = prev.pedagogyTypes.includes(type) 
+            ? prev.pedagogyTypes.filter(t => t !== type) 
+            : [...prev.pedagogyTypes, type];
+          return { ...prev, pedagogyTypes: types };
+        });
+      };
+
+      const updateArrayItem = (arrayName, index, value) => {
+        setFormData(prev => {
+          const newArr = [...prev[arrayName]];
+          newArr[index] = value;
+          return { ...prev, [arrayName]: newArr };
+        });
+      };
 
       if (creating) {
         return (
           <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden max-w-5xl mx-auto border border-slate-200">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shadow-lg"><h2 className="text-2xl font-black uppercase tracking-widest italic">Nouvelle Évaluation</h2><button onClick={() => setCreating(false)} className="bg-white/10 p-2 rounded-full"><XCircle /></button></div>
-            <div className="p-10 space-y-12 max-h-[80vh] overflow-y-auto custom-scrollbar">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shadow-lg sticky top-0 z-10">
+              <h2 className="text-2xl font-black uppercase tracking-widest italic">Nouvelle Évaluation Pédagogique</h2>
+              <button onClick={() => setCreating(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><XCircle /></button>
+            </div>
+            
+            <div className="p-10 space-y-12">
+              {/* Entête */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
                 <FormInput label="Enseignant observé"><select className="p-3 border-2 border-slate-200 rounded-2xl w-full bg-white font-bold" value={formData.profId} onChange={e => setFormData({...formData, profId: e.target.value})}><option value="">Sélectionner...</option>{profs.map(p => <option key={p.id} value={p.id}>{p.username}</option>)}</select></FormInput>
                 <FormInput label="Classe"><input className="p-3 border-2 border-slate-200 rounded-2xl w-full font-bold" placeholder="ex: 3ème B" onChange={e => setFormData({...formData, class: e.target.value})} /></FormInput>
@@ -342,21 +411,143 @@
                 <FormInput label="Date"><div className="relative"><Calendar className="absolute left-3 top-3.5 text-slate-400" size={18} /><input type="date" className="p-3 pl-10 border-2 rounded-2xl w-full font-bold" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div></FormInput>
                 <FormInput label="Période"><div className="relative"><Clock className="absolute left-3 top-3.5 text-slate-400" size={18} /><select className="p-3 pl-10 border-2 rounded-2xl w-full font-bold" value={formData.order} onChange={e => setFormData({...formData, order: e.target.value})}>{PERIODES.map(p => <option key={p} value={p}>{p}</option>)}</select></div></FormInput>
               </div>
-              <div className="space-y-12">
-                {CRITERIA.map(cat => (
-                  <div key={cat.id} className="border-2 border-slate-100 rounded-[3rem] overflow-hidden shadow-sm">
-                    <div className="bg-indigo-700 text-white px-10 py-5 flex justify-between items-center uppercase tracking-widest text-xs font-black"><span>{cat.title}</span><span className="bg-indigo-900/40 px-4 py-1 rounded-full">Barème: {cat.max} pts</span></div>
-                    <div className="p-10 space-y-6 bg-white">
-                      {cat.items.map((item, idx) => (
-                        <div key={idx} className="flex flex-col sm:flex-row justify-between gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-indigo-100"><span className="text-sm font-bold text-slate-700">{item.label}</span><div className="flex items-center gap-3"><input type="number" max={item.max} min="0" className="w-20 p-3 border-2 rounded-xl text-center font-black" onChange={(e) => setFormData({...formData, scores: {...formData.scores, [`${cat.id}_${idx}`]: Math.min(item.max, Math.max(0, e.target.value))}})} /><span className="text-slate-400 font-bold text-xs">/ {item.max}</span></div></div>
-                      ))}
-                      <div className="mt-8"><label className="text-[10px] font-black uppercase text-indigo-400 block mb-3 ml-4 italic">Commentaires spécifiques</label><textarea className="w-full p-5 border-2 rounded-3xl text-sm bg-slate-50" placeholder="Observations..." rows="3" onChange={e => setFormData({...formData, sectionComments: {...formData.sectionComments, [cat.id]: e.target.value}})} /></div>
-                    </div>
+
+              {/* Les 5 Sections d'Évaluation */}
+              {SECTIONS.map(sec => (
+                <div key={sec.id} className="border-2 border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+                  <div className="bg-indigo-700 text-white px-8 py-4 font-black uppercase text-sm">{sec.title}</div>
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-left min-w-[600px]">
+                      <thead>
+                        <tr className="text-[10px] uppercase text-slate-400 border-b-2">
+                          <th className="pb-3 w-1/3">Critères</th>
+                          {sec.options.map(opt => <th key={opt} className="pb-3 text-center w-1/6">{opt}</th>)}
+                          <th className="pb-3 pl-4">Observations</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {sec.criteria.map((crit, idx) => {
+                          const currentEval = formData.evaluations[`${sec.id}_${idx}`] || {};
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-4 pr-4 text-sm font-bold text-slate-700 leading-tight">{crit}</td>
+                              {sec.options.map(opt => (
+                                <td key={opt} className="py-4 text-center">
+                                  <input type="radio" name={`${sec.id}_${idx}`} value={opt} checked={currentEval.choice === opt} onChange={() => handleEvalChange(sec.id, idx, 'choice', opt)} className="w-5 h-5 accent-indigo-600 cursor-pointer" />
+                                </td>
+                              ))}
+                              <td className="py-4 pl-4">
+                                <input type="text" className="w-full p-2 border rounded-xl text-xs bg-white" placeholder="Remarque..." value={currentEval.obs || ''} onChange={(e) => handleEvalChange(sec.id, idx, 'obs', e.target.value)} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
+                  
+                  {/* Options Spécifiques par Section */}
+                  <div className="bg-slate-50 p-6 border-t border-slate-100 space-y-4">
+                    {sec.hasPedagogy && (
+                      <div>
+                        <p className="text-xs font-black uppercase text-indigo-600 mb-3">🔎 Type de pédagogie observée :</p>
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          {['Magistrale', 'Interactive', 'Classe inversée', 'Travail de groupe', 'Approche par compétences'].map(type => (
+                            <label key={type} className="flex items-center gap-2 text-sm font-medium cursor-pointer bg-white px-3 py-1.5 rounded-lg border shadow-sm">
+                              <input type="checkbox" checked={formData.pedagogyTypes.includes(type)} onChange={() => handlePedagogyToggle(type)} className="accent-indigo-600" /> {type}
+                            </label>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm"><span className="font-bold">Autre :</span><input type="text" className="border-b-2 border-slate-300 bg-transparent outline-none flex-1 focus:border-indigo-600" value={formData.pedagogyOther} onChange={e => setFormData({...formData, pedagogyOther: e.target.value})} /></div>
+                      </div>
+                    )}
+
+                    {sec.hasEngagement && (
+                      <div>
+                        <p className="text-xs font-black uppercase text-indigo-600 mb-3">🔎 Niveau d'engagement global :</p>
+                        <div className="flex gap-4">
+                          {['Élevé', 'Moyen', 'Faible'].map(lvl => (
+                            <label key={lvl} className="flex items-center gap-2 text-sm font-medium cursor-pointer bg-white px-4 py-2 rounded-xl border shadow-sm"><input type="radio" name="engagement" value={lvl} onChange={e => setFormData({...formData, engagement: e.target.value})} className="accent-indigo-600" /> {lvl}</label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {sec.hasRelation && (
+                      <div>
+                        <p className="text-xs font-black uppercase text-indigo-600 mb-3">🔎 Relation enseignant–élèves :</p>
+                        <div className="flex flex-wrap gap-4">
+                          {['Excellente', 'Correcte', 'Distante', 'Tendue'].map(rel => (
+                            <label key={rel} className="flex items-center gap-2 text-sm font-medium cursor-pointer bg-white px-4 py-2 rounded-xl border shadow-sm"><input type="radio" name="relation" value={rel} onChange={e => setFormData({...formData, relation: e.target.value})} className="accent-indigo-600" /> {rel}</label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {sec.hasComment && (
+                      <div>
+                        <p className="text-xs font-black uppercase text-indigo-600 mb-2">🔎 Commentaires :</p>
+                        <textarea className="w-full p-3 border rounded-xl text-sm" rows="2" value={formData.comments[sec.id] || ''} onChange={e => setFormData({...formData, comments: {...formData.comments, [sec.id]: e.target.value}})}></textarea>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Sections 6 & 7 : Synthèse */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100">
+                  <h3 className="font-black uppercase text-emerald-800 mb-4">6️⃣ Points Forts Observés</h3>
+                  <div className="space-y-3">
+                    {[0, 1, 2].map(i => <div key={i} className="flex items-center gap-2"><CheckCircle className="text-emerald-500" size={18}/><input type="text" className="flex-1 p-2 rounded-lg border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500" value={formData.pointsForts[i]} onChange={e => updateArrayItem('pointsForts', i, e.target.value)} /></div>)}
+                  </div>
+                </div>
+                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100">
+                  <h3 className="font-black uppercase text-amber-800 mb-4">7️⃣ Axes d'Amélioration</h3>
+                  <div className="space-y-3">
+                    {[0, 1, 2].map(i => <div key={i} className="flex items-center gap-2"><div className="w-2 h-2 bg-amber-500 rounded-full ml-1 mr-1"></div><input type="text" className="flex-1 p-2 rounded-lg border-amber-200 outline-none focus:ring-2 focus:ring-amber-500" value={formData.axesAmelioration[i]} onChange={e => updateArrayItem('axesAmelioration', i, e.target.value)} /></div>)}
+                  </div>
+                </div>
               </div>
-              <div className="p-10 bg-slate-900 text-white rounded-[3.5rem] shadow-2xl border-t-8 border-indigo-500"><h3 className="text-xl font-black uppercase mb-6 flex items-center gap-3 italic"><FileText className="text-indigo-400"/> Conclusion</h3><textarea className="w-full p-6 border-2 border-slate-700 bg-slate-800 rounded-3xl" rows="6" onChange={e => setFormData({...formData, finalComment: e.target.value})} /></div>
-              <div className="bg-indigo-700 text-white p-10 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl"><div className="text-center md:text-left"><p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.3em] mb-2 leading-none">Total points</p><div className="text-6xl font-black tabular-nums">{total} <span className="text-2xl text-indigo-300 font-normal">/ 100</span></div><p className={`mt-2 font-black uppercase tracking-tighter text-lg ${appreciation.color}`}>{appreciation.label}</p></div><button className="bg-white text-indigo-700 px-16 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl disabled:opacity-50" disabled={!formData.profId} onClick={() => onAddFiche(formData)}>Valider & Publier</button></div>
+
+              {/* Section 8 : Recommandations */}
+              <div className="border-2 border-slate-200 p-8 rounded-[2.5rem] bg-white">
+                <h3 className="font-black uppercase text-slate-800 mb-6">8️⃣ Recommandations et Plan d'Accompagnement</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {['entretien', 'accompagnement', 'formation'].map((key, i) => {
+                    const labels = ["Observation suivie d’un entretien", "Accompagnement personnalisé", "Formation recommandée"];
+                    return (
+                      <label key={key} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors border"><input type="checkbox" checked={formData.recommandations[key]} onChange={e => setFormData({...formData, recommandations: {...formData.recommandations, [key]: e.target.checked}})} className="w-5 h-5 accent-indigo-600" /> <span className="font-bold text-sm">{labels[i]}</span></label>
+                    );
+                  })}
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border">
+                    <input type="checkbox" checked={formData.recommandations.nouvelleVisite} onChange={e => setFormData({...formData, recommandations: {...formData.recommandations, nouvelleVisite: e.target.checked}})} className="w-5 h-5 accent-indigo-600" /> 
+                    <span className="font-bold text-sm">Nouvelle visite le :</span>
+                    <input type="date" disabled={!formData.recommandations.nouvelleVisite} className="p-1 border rounded bg-white text-xs disabled:opacity-50" value={formData.recommandations.dateVisite} onChange={e => setFormData({...formData, recommandations: {...formData.recommandations, dateVisite: e.target.value}})} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 9 : Conclusion */}
+              <div className="p-10 bg-slate-900 text-white rounded-[3.5rem] border-t-8 border-indigo-500 shadow-2xl">
+                <h3 className="text-xl font-black uppercase mb-6 flex items-center gap-3"><FileText className="text-indigo-400"/> 📝 Appréciation Globale</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  {APPRECIATIONS.map(app => (
+                    <label key={app.label} className={`flex flex-col items-center justify-center p-4 rounded-2xl cursor-pointer border-2 transition-all ${formData.appreciationGlobale === app.label ? `bg-white ${app.color} border-current scale-105 shadow-lg` : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}>
+                      <input type="radio" name="app_globale" className="hidden" value={app.label} onChange={e => setFormData({...formData, appreciationGlobale: e.target.value})} />
+                      <span className="font-black text-center text-sm uppercase leading-tight">{app.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <label className="text-xs font-black uppercase text-indigo-300 block mb-2">Commentaire final :</label>
+                <textarea className="w-full p-6 border-2 border-slate-700 bg-slate-800 rounded-3xl text-slate-200 outline-none focus:border-indigo-500" rows="4" value={formData.commentFinal} onChange={e => setFormData({...formData, commentFinal: e.target.value})} />
+              </div>
+
+              {/* Validation */}
+              <div className="bg-indigo-700 p-8 rounded-[3rem] text-center shadow-2xl">
+                <button className="bg-white text-indigo-700 px-16 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50" disabled={!formData.profId || !formData.appreciationGlobale} onClick={() => onAddFiche(formData)}>Enregistrer l'Observation</button>
+                {(!formData.profId || !formData.appreciationGlobale) && <p className="text-indigo-300 text-xs mt-4 font-bold uppercase">Sélectionnez un professeur et l'appréciation globale pour valider.</p>}
+              </div>
             </div>
           </div>
         );
@@ -365,18 +556,25 @@
       const groupedFiches = fiches.reduce((acc, f) => { let key = groupBy === 'prof' ? users.find(u => u.id === f.profId)?.username : f.class; key = key || 'Autre'; if (!acc[key]) acc[key] = []; acc[key].push(f); return acc; }, {});
 
       return (
-        <div className="space-y-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4"><h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Visites de classe</h2><button onClick={() => setCreating(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-3"><PlusCircle size={24}/> Créer fiche</button></div>
-          {fiches.length > 0 && (<div className="flex gap-2 bg-slate-200 p-1 rounded-2xl w-fit mx-auto md:mx-0"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'prof' ? 'bg-white text-indigo-700' : 'text-slate-500'}`}>Par Professeur</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'class' ? 'bg-white text-indigo-700' : 'text-slate-500'}`}>Par Classe</button></div>)}
-          {fiches.length === 0 ? (<div className="py-32 text-center bg-white rounded-[4rem] border-4 border-dashed border-slate-100"><p className="text-slate-300 font-black uppercase">Aucune évaluation</p></div>) : (<div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase border-b-4 border-indigo-100 pb-2 inline-block">{key} <span className="text-sm bg-indigo-50 px-3 py-1 rounded-xl ml-3">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>)}
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4"><h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Visites de classe</h2><button onClick={() => setCreating(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-3 shadow-lg hover:bg-indigo-700 transition-all"><PlusCircle size={24}/> Créer fiche</button></div>
+          {fiches.length > 0 && (<div className="flex gap-2 bg-slate-200 p-1 rounded-2xl w-fit mx-auto md:mx-0"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${groupBy === 'prof' ? 'bg-white shadow-md text-indigo-700' : 'text-slate-500'}`}>Par Prof</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${groupBy === 'class' ? 'bg-white shadow-md text-indigo-700' : 'text-slate-500'}`}>Par Classe</button></div>)}
+          {fiches.length === 0 ? (<div className="py-32 text-center bg-white rounded-[4rem] border-4 border-dashed border-slate-100 flex flex-col items-center"><ClipboardList size={64} className="text-slate-200 mb-6"/><p className="text-slate-300 font-black uppercase tracking-widest">Aucune évaluation réalisée</p></div>) : (<div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter border-b-4 border-indigo-100 pb-2 inline-block">{key} <span className="text-sm bg-indigo-50 text-indigo-600 px-3 py-1 rounded-xl ml-3 align-middle">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>)}
         </div>
       );
     }
 
+    // --- PANNEAUX PROF ET DIRECTION ---
     function ProfPanel({ fiches, user, users, onOpenFiche }) {
       const myFiches = fiches.filter(f => f.profId === user.id);
       return (
-        <div className="space-y-8"><h2 className="text-3xl font-black text-slate-900 uppercase italic">Mes Observations</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{myFiches.map(f => <FicheCard key={f.id} fiche={f} profName={user.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}{myFiches.length === 0 && <div className="col-span-full py-32 text-center bg-white rounded-[4rem] border-2 border-dashed">Aucune fiche.</div>}</div></div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic text-center md:text-left">Mes Observations</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {myFiches.map(f => <FicheCard key={f.id} fiche={f} profName={user.username} responsableName={users.find(u => u.id === f.responsableId)?.username} onOpen={() => onOpenFiche(f)} />)}
+            {myFiches.length === 0 && <div className="col-span-full py-32 text-center bg-white rounded-[4rem] border-2 border-dashed border-slate-200 text-slate-300">Aucune fiche disponible.</div>}
+          </div>
+        </div>
       );
     }
 
@@ -384,39 +582,169 @@
       const [groupBy, setGroupBy] = useState('prof');
       const groupedFiches = fiches.reduce((acc, f) => { let key = groupBy === 'prof' ? users.find(u => u.id === f.profId)?.username : (groupBy === 'class' ? f.class : users.find(u => u.id === f.responsableId)?.username); key = key || 'Autre'; if (!acc[key]) acc[key] = []; acc[key].push(f); return acc; }, {});
       return (
-        <div className="space-y-8"><h2 className="text-3xl font-black text-slate-900 uppercase italic">Supervision</h2>
-          {fiches.length > 0 && (<div className="flex gap-2 bg-slate-200 p-1 rounded-2xl w-fit"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'prof' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Prof</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'class' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Classe</button><button onClick={() => setGroupBy('responsable')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'responsable' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Resp.</button></div>)}
-          <div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase border-b-4 border-amber-100 pb-2 inline-block">{key} <span className="text-sm bg-amber-50 px-3 py-1 rounded-xl ml-3">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic text-center md:text-left">Supervision Direction</h2>
+          {fiches.length > 0 && (<div className="flex flex-wrap gap-2 bg-slate-200 p-1 rounded-2xl w-fit mx-auto md:mx-0"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${groupBy === 'prof' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Par Prof</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${groupBy === 'class' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Par Classe</button><button onClick={() => setGroupBy('responsable')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl transition-all ${groupBy === 'responsable' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Par Responsable</button></div>)}
+          {fiches.length === 0 ? (<div className="py-32 text-center bg-white rounded-[4rem] border-2 border-dashed border-slate-200 text-slate-300">En attente de rapports.</div>) : (<div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter border-b-4 border-amber-100 pb-2 inline-block">{key} <span className="text-sm bg-amber-50 text-amber-600 px-3 py-1 rounded-xl ml-3 align-middle">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>)}
         </div>
       );
     }
 
+    // --- LECTURE DÉTAILLÉE DE LA FICHE ---
     function FicheDetailModal({ fiche, user, users, onClose, onAddProfComment, onEditProfComment, onAddDirRemark, onEditDirRemark }) {
       const prof = users.find(u => u.id === fiche.profId);
       const responsable = users.find(u => u.id === fiche.responsableId);
-      const total = Object.values(fiche.scores).reduce((a, b) => a + (Number(b) || 0), 0);
-      const app = getAppreciation(total);
+      const appStyle = getAppreciationStyle(fiche.appreciationGlobale);
       const [commentText, setCommentText] = useState("");
       const [editingProfIdx, setEditingProfIdx] = useState(null);
       const [editProfText, setEditProfText] = useState("");
       const [editingDirIdx, setEditingDirIdx] = useState(null);
       const [editDirText, setEditDirText] = useState("");
 
+      // Sécurité si ancienne fiche
+      const evaluations = fiche.evaluations || {};
+      const pointsForts = fiche.pointsForts || [];
+      const axesAmelioration = fiche.axesAmelioration || [];
+      const recommandations = fiche.recommandations || {};
+
       return (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-8 bg-indigo-700 text-white flex justify-between items-center shadow-lg"><div><h2 className="text-3xl font-black uppercase italic">Fiche Officielle</h2><div className="flex gap-4 mt-2"><span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{prof?.username}</span><span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{fiche.class}</span></div></div><button onClick={onClose} className="bg-white text-indigo-700 p-3 rounded-2xl hover:bg-red-500 hover:text-white"><XCircle className="text-xl" /></button></div>
-            <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
-              <div className="grid grid-cols-4 gap-6"><StatBox label="Note Finale" val={total} max="/ 100" color={app.color} /><StatBox label="Date" val={new Date(fiche.date).toLocaleDateString()} /><StatBox label="Période" val={fiche.order} /><StatBox label="Appréciation" val={app.label} isBadge color={app.color} /></div>
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in duration-300">
+            {/* Header */}
+            <div className="p-8 bg-indigo-700 text-white flex justify-between items-center shadow-lg">
+              <div>
+                <h2 className="text-3xl font-black uppercase tracking-tighter italic">Fiche d'Observation Pédagogique</h2>
+                <div className="flex flex-wrap gap-2 md:gap-4 mt-3">
+                  <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest"><UserCheck size={12} className="inline mr-1"/> {prof?.username}</span>
+                  {responsable && <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest"><Eye size={12} className="inline mr-1"/> Obs. par {responsable.username}</span>}
+                  <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest"><Users size={12} className="inline mr-1"/> {fiche.class}</span>
+                  <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest"><ClipboardList size={12} className="inline mr-1"/> {fiche.subject}</span>
+                </div>
+              </div>
+              <button onClick={onClose} className="bg-white text-indigo-700 p-4 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-xl"><XCircle className="text-2xl" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-12 custom-scrollbar">
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <StatBox label="Date Séance" val={new Date(fiche.date).toLocaleDateString()} />
+                <StatBox label="Ordre / Période" val={fiche.order} />
+                <div className={`col-span-2 p-6 rounded-3xl border-2 flex flex-col items-center justify-center text-center ${appStyle.bg} border-current`}>
+                  <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${appStyle.color}`}>Appréciation Globale</span>
+                  <span className={`text-2xl font-black uppercase ${appStyle.color}`}>{fiche.appreciationGlobale || 'Non renseigné'}</span>
+                </div>
+              </div>
+
+              {/* Tableaux Lecture Seule */}
               <div className="space-y-10">
-                {CRITERIA.map(cat => (
-                  <div key={cat.id} className="border-2 border-slate-100 rounded-[2.5rem] overflow-hidden"><div className="bg-slate-900 text-white px-8 py-4 flex justify-between"><h3 className="font-black text-sm uppercase">{cat.title}</h3><span className="text-indigo-400 font-black">{cat.items.reduce((acc, _, idx) => acc + (fiche.scores[`${cat.id}_${idx}`] || 0), 0)} / {cat.max}</span></div><div className="p-8 space-y-4">{cat.items.map((item, idx) => (<div key={idx} className="flex justify-between border-b pb-3 text-sm"><span className="text-slate-600 font-medium">{item.label}</span><span className="font-black bg-slate-100 px-3 py-1 rounded-lg">{fiche.scores[`${cat.id}_${idx}`] || 0} / {item.max}</span></div>))}<div className="mt-6 p-5 bg-indigo-50 rounded-2xl"><p className="text-[10px] font-black text-indigo-400 uppercase mb-2">Observation</p><p className="text-sm italic">{fiche.sectionComments?.[cat.id] || "Aucune"}</p></div></div></div>
+                {SECTIONS.map(sec => (
+                  <div key={sec.id} className="border-2 border-slate-100 rounded-[2rem] overflow-hidden">
+                    <div className="bg-slate-900 text-white px-8 py-4 font-black uppercase text-sm">{sec.title}</div>
+                    <div className="p-6 overflow-x-auto">
+                      <table className="w-full text-left min-w-[600px]">
+                        <thead>
+                          <tr className="text-[10px] uppercase text-slate-400 border-b-2"><th className="pb-3 w-1/3">Critères</th><th className="pb-3 text-center">Évaluation</th><th className="pb-3 pl-4">Observations</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {sec.criteria.map((crit, idx) => {
+                            const currentEval = evaluations[`${sec.id}_${idx}`] || {};
+                            return (
+                              <tr key={idx}>
+                                <td className="py-4 pr-4 text-sm font-bold text-slate-700 leading-tight">{crit}</td>
+                                <td className="py-4 text-center"><span className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-black uppercase text-slate-600">{currentEval.choice || '-'}</span></td>
+                                <td className="py-4 pl-4"><p className="text-sm italic text-slate-500">{currentEval.obs || '-'}</p></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Synthèse Options */}
+                    {(sec.hasPedagogy || sec.hasEngagement || sec.hasRelation || sec.hasComment) && (
+                      <div className="bg-indigo-50 p-6 border-t border-indigo-100 text-sm space-y-4">
+                        {sec.hasPedagogy && <p><span className="font-black text-indigo-700 uppercase text-xs">Pédagogie observée :</span> {(fiche.pedagogyTypes || []).join(', ')} {fiche.pedagogyOther && `(${fiche.pedagogyOther})`}</p>}
+                        {sec.hasEngagement && <p><span className="font-black text-indigo-700 uppercase text-xs">Engagement des élèves :</span> <span className="font-bold bg-white px-2 py-1 rounded shadow-sm">{fiche.engagement || '-'}</span></p>}
+                        {sec.hasRelation && <p><span className="font-black text-indigo-700 uppercase text-xs">Relation Prof/Élèves :</span> <span className="font-bold bg-white px-2 py-1 rounded shadow-sm">{fiche.relation || '-'}</span></p>}
+                        {sec.hasComment && fiche.comments?.[sec.id] && <div className="mt-4 bg-white p-4 rounded-xl shadow-sm"><p className="text-[10px] font-black text-indigo-400 uppercase mb-1">Commentaire spécifique</p><p className="italic text-indigo-900">{fiche.comments[sec.id]}</p></div>}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
-              <div className="bg-slate-900 text-white p-10 rounded-[3rem] border-t-8 border-indigo-500"><h3 className="text-2xl font-black uppercase mb-6 italic">Conclusion Générale</h3><p className="text-slate-300 italic text-lg">{fiche.finalComment || "Aucune"}</p></div>
-              <div className="grid grid-cols-2 gap-12 pt-8 border-t-2">
-                <div className="space-y-6"><h4 className="text-lg font-black uppercase flex items-center gap-3 text-indigo-600">Réponses Prof</h4><div className="space-y-4 max-h-64 overflow-y-auto">{fiche.profComments.map((c, i) => (<div key={i} className="p-5 bg-white border rounded-3xl text-sm relative group">{editingProfIdx === i ? (<div className="space-y-3"><textarea className="w-full p-3 border-2 rounded-xl" rows="3" value={editProfText} onChange={e => setEditProfText(e.target.value)} /><div className="flex gap-2"><button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditProfComment(fiche.id, i, editProfText); setEditingProfIdx(null); }}>Enregistrer</button></div></div>) : (<><p className="italic">"{c.text}"</p><span className="block text-[9px] font-black text-slate-400 mt-3">— {c.date}</span>{user.role === ROLES.PROF && user.id === fiche.profId && (<button className="absolute top-4 right-4 text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingProfIdx(i); setEditProfText(c.text); }}><Pencil /></button>)}</>)}</div>))}{fiche.profComments.length === 0 && <p className="text-xs text-center border-2 border-dashed rounded-3xl py-6">Aucune explication.</p>}</div>{user.role === ROLES.PROF && user.id === fiche.profId && (<div className="bg-indigo-50 p-6 rounded-[2rem]"><textarea className="w-full p-4 border-2 rounded-2xl text-sm" rows="3" value={commentText} onChange={e => setCommentText(e.target.value)} /><button className="w-full bg-indigo-600 text-white py-4 rounded-2xl text-xs font-black mt-3" onClick={() => { if(commentText) onAddProfComment(fiche.id, commentText); setCommentText(""); }}>Ajouter</button></div>)}</div>
-                <div className="space-y-6"><h4 className="text-lg font-black uppercase flex items-center gap-3 text-amber-600">Remarques Direction</h4><div className="space-y-4 max-h-64 overflow-y-auto">{fiche.directionRemarks.map((r, i) => (<div key={i} className="p-5 bg-amber-50 border border-amber-100 rounded-3xl text-sm relative group">{editingDirIdx === i ? (<div className="space-y-3"><textarea className="w-full p-3 border-2 border-amber-200 rounded-xl" rows="3" value={editDirText} onChange={e => setEditDirText(e.target.value)} /><div className="flex gap-2"><button className="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditDirRemark(fiche.id, i, editDirText); setEditingDirIdx(null); }}>Enregistrer</button></div></div>) : (<><p>"{r.text}"</p><span className="block text-[9px] font-black text-amber-500 mt-3">— {r.date}</span>{user.role === ROLES.DIRECTION && (<button className="absolute top-4 right-4 text-amber-300 hover:text-amber-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingDirIdx(i); setEditDirText(r.text); }}><Pencil /></button>)}</>)}</div>))}{fiche.directionRemarks.length === 0 && <p className="text-xs text-center border-2 border-dashed rounded-3xl py-6">Aucune remarque.</p>}</div>{user.role === ROLES.DIRECTION && (<div className="bg-amber-50 p-6 rounded-[2rem]"><textarea className="w-full p-4 border-2 rounded-2xl text-sm border-white" rows="3" value={commentText} onChange={e => setCommentText(e.target.value)} /><button className="w-full bg-amber-500 text-white py-4 rounded-2xl text-xs font-black mt-3" onClick={() => { if(commentText) onAddDirRemark(fiche.id, commentText); setCommentText(""); }}>Ajouter</button></div>)}</div>
+
+              {/* Sections 6, 7 & 8 */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-emerald-50 p-8 rounded-[2rem] border border-emerald-100">
+                  <h3 className="font-black uppercase text-emerald-800 mb-4 text-sm">6️⃣ Points Forts</h3>
+                  <ul className="space-y-3">
+                    {pointsForts.map((pt, i) => pt ? <li key={i} className="flex gap-2 text-sm"><CheckCircle className="text-emerald-500 flex-shrink-0" size={16}/> <span className="font-medium text-emerald-900">{pt}</span></li> : null)}
+                  </ul>
+                </div>
+                <div className="bg-amber-50 p-8 rounded-[2rem] border border-amber-100">
+                  <h3 className="font-black uppercase text-amber-800 mb-4 text-sm">7️⃣ Axes d'Amélioration</h3>
+                  <ul className="space-y-3">
+                    {axesAmelioration.map((ax, i) => ax ? <li key={i} className="flex gap-2 text-sm"><div className="w-2 h-2 bg-amber-500 rounded-full mt-1.5 flex-shrink-0"></div> <span className="font-medium text-amber-900">{ax}</span></li> : null)}
+                  </ul>
+                </div>
+                <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200">
+                  <h3 className="font-black uppercase text-slate-800 mb-4 text-sm">8️⃣ Accompagnement</h3>
+                  <ul className="space-y-3 text-sm font-medium text-slate-700">
+                    {recommandations.entretien && <li className="flex items-center gap-2"><CheckCircle className="text-indigo-500" size={16}/> Entretien pédagogique</li>}
+                    {recommandations.accompagnement && <li className="flex items-center gap-2"><CheckCircle className="text-indigo-500" size={16}/> Accompagnement personnalisé</li>}
+                    {recommandations.formation && <li className="flex items-center gap-2"><CheckCircle className="text-indigo-500" size={16}/> Formation recommandée</li>}
+                    {recommandations.nouvelleVisite && <li className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200"><Calendar className="text-indigo-500" size={16}/> Nouvelle visite prévue le : <span className="font-black">{new Date(recommandations.dateVisite).toLocaleDateString()}</span></li>}
+                    {!recommandations.entretien && !recommandations.accompagnement && !recommandations.formation && !recommandations.nouvelleVisite && <li className="italic text-slate-400">Aucune recommandation cochée.</li>}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Conclusion Globale */}
+              <div className="bg-slate-900 text-white p-10 rounded-[3rem] border-t-8 border-indigo-500 shadow-2xl">
+                 <h3 className="text-xl font-black uppercase mb-4 flex items-center gap-3"><FileText className="text-indigo-400"/> Commentaire Final (Responsable)</h3>
+                 <p className="text-slate-300 italic text-lg leading-relaxed whitespace-pre-wrap">{fiche.commentFinal || "Aucun commentaire général."}</p>
+              </div>
+
+              {/* Espace Échanges (Comme avant) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8 border-t-2 border-slate-100">
+                <div className="space-y-6">
+                  <h4 className="text-lg font-black uppercase flex items-center gap-3"><MessageSquare className="text-indigo-500"/> Réponses du Professeur</h4>
+                  <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                    {fiche.profComments.map((c, i) => (
+                      <div key={i} className="p-5 bg-white border border-slate-200 rounded-3xl shadow-sm text-sm relative group">
+                        {editingProfIdx === i ? (
+                          <div className="space-y-3"><textarea className="w-full p-3 border-2 border-indigo-100 rounded-xl outline-none" rows="3" value={editProfText} onChange={e => setEditProfText(e.target.value)} /><div className="flex gap-2"><button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditProfComment(fiche.id, i, editProfText); setEditingProfIdx(null); }}>Enregistrer</button><button className="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold" onClick={() => setEditingProfIdx(null)}>Annuler</button></div></div>
+                        ) : (<><p className="italic">"{c.text}"</p><span className="block text-[9px] font-black text-slate-400 mt-3 uppercase">— {c.date}</span>{user.role === ROLES.PROF && user.id === fiche.profId && <button className="absolute top-4 right-4 text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingProfIdx(i); setEditProfText(c.text); }}><Pencil size={14} /></button>}</>)}
+                      </div>
+                    ))}
+                    {fiche.profComments.length === 0 && <p className="text-xs text-slate-300 text-center py-6 border-2 border-dashed rounded-3xl">Aucune explication.</p>}
+                  </div>
+                  {user.role === ROLES.PROF && user.id === fiche.profId && (
+                    <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 shadow-inner">
+                      <textarea className="w-full p-4 border-2 border-white rounded-2xl text-sm focus:border-indigo-500 outline-none" rows="3" placeholder="Écrire votre réponse..." value={commentText} onChange={e => setCommentText(e.target.value)} />
+                      <button className="w-full bg-indigo-600 text-white py-4 rounded-2xl text-xs font-black uppercase mt-3 hover:bg-indigo-700 active:scale-95 transition-all shadow-lg" onClick={() => { if(commentText.trim()) { onAddProfComment(fiche.id, commentText); setCommentText(""); } }}>Ajouter un commentaire</button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-6">
+                  <h4 className="text-lg font-black uppercase flex items-center gap-3"><ShieldCheck className="text-amber-500"/> Remarques Direction</h4>
+                  <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                    {fiche.directionRemarks.map((r, i) => (
+                      <div key={i} className="p-5 bg-amber-50 border border-amber-100 rounded-3xl text-sm text-amber-900 relative group">
+                        {editingDirIdx === i ? (
+                          <div className="space-y-3"><textarea className="w-full p-3 border-2 border-amber-200 rounded-xl outline-none" rows="3" value={editDirText} onChange={e => setEditDirText(e.target.value)} /><div className="flex gap-2"><button className="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditDirRemark(fiche.id, i, editDirText); setEditingDirIdx(null); }}>Enregistrer</button><button className="bg-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => setEditingDirIdx(null)}>Annuler</button></div></div>
+                        ) : (<><p>"{r.text}"</p><span className="block text-[9px] font-black text-amber-500 mt-3 uppercase">— {r.date}</span>{user.role === ROLES.DIRECTION && <button className="absolute top-4 right-4 text-amber-300 hover:text-amber-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingDirIdx(i); setEditDirText(r.text); }}><Pencil size={14} /></button>}</>)}
+                      </div>
+                    ))}
+                    {fiche.directionRemarks.length === 0 && <p className="text-xs text-amber-200 text-center py-6 border-2 border-dashed rounded-3xl">Aucune remarque.</p>}
+                  </div>
+                  {user.role === ROLES.DIRECTION && (
+                    <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 shadow-inner">
+                      <textarea className="w-full p-4 border-2 border-white rounded-2xl text-sm focus:border-amber-500 outline-none" rows="3" placeholder="Note de supervision..." value={commentText} onChange={e => setCommentText(e.target.value)} />
+                      <button className="w-full bg-amber-500 text-white py-4 rounded-2xl text-xs font-black uppercase mt-3 hover:bg-amber-600 active:scale-95 transition-all shadow-lg" onClick={() => { if(commentText.trim()) { onAddDirRemark(fiche.id, commentText); setCommentText(""); } }}>Ajouter la remarque</button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -424,58 +752,76 @@
       );
     }
 
-    function FicheCard({ fiche, profName, responsableName, total, onOpen }) {
-      const app = getAppreciation(total);
+    // --- MISE À JOUR CARTE FICHE ---
+    function FicheCard({ fiche, profName, responsableName, onOpen }) {
+      const appStyle = getAppreciationStyle(fiche.appreciationGlobale);
       return (
-        <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-100 relative overflow-hidden group">
-          <div className={`absolute top-0 right-0 w-32 h-32 ${app.bg} rounded-bl-[6rem] -mr-8 -mt-8 opacity-40 transition-transform group-hover:scale-110`}></div>
-          <div className="flex justify-between items-start mb-8 relative z-10"><div><h3 className="font-black uppercase text-xl">{profName}</h3><p className="text-[10px] font-black text-indigo-500 mt-2 uppercase">{fiche.subject}</p>{responsableName && <p className="text-[9px] font-black text-slate-400 mt-3 uppercase flex items-center gap-1.5"><UserCheck className="text-[10px] text-indigo-400"/> par {responsableName}</p>}</div><div className="text-right"><span className={`text-3xl font-black ${app.color}`}>{total}</span><p className={`text-[8px] font-black uppercase mt-1 ${app.color}`}>{app.label}</p></div></div>
-          <div className="flex gap-4 mb-8 bg-slate-50 p-4 rounded-2xl relative z-10"><div className="flex-1 text-[9px] font-black uppercase text-slate-400">Classe <span className="block text-slate-800 mt-1">{fiche.class}</span></div><div className="flex-1 text-[9px] font-black uppercase text-slate-400 text-right">Période <span className="block text-slate-800 mt-1">{fiche.order}</span></div></div>
-          <button onClick={onOpen} className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase flex justify-center gap-3 relative z-10 hover:bg-indigo-700"><Maximize2 /> Détails & Échanges</button>
+        <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-100 hover:shadow-2xl transition-all group relative overflow-hidden">
+          <div className={`absolute top-0 right-0 w-32 h-32 ${appStyle.bg} rounded-bl-[6rem] -mr-8 -mt-8 opacity-40 transition-transform group-hover:scale-110`}></div>
+          <div className="flex flex-col items-start mb-8 relative z-10 space-y-4">
+            <div className="w-full flex justify-between items-start">
+              <div>
+                <h3 className="font-black text-slate-900 uppercase leading-none text-xl tracking-tight">{profName}</h3>
+                <p className="text-[10px] font-black text-indigo-500 mt-2 uppercase tracking-[0.2em]">{fiche.subject}</p>
+              </div>
+              <div className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center shadow-sm border ${appStyle.bg} ${appStyle.color}`}>
+                {fiche.appreciationGlobale || 'Non évalué'}
+              </div>
+            </div>
+            {responsableName && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest"><UserCheck size={12} className="inline text-indigo-400 mr-1"/> par {responsableName}</p>}
+          </div>
+          <div className="flex gap-4 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-100 relative z-10">
+            <div className="flex-1 text-[9px] font-black uppercase text-slate-400">Classe <span className="block text-slate-800 mt-1">{fiche.class}</span></div>
+            <div className="flex-1 text-[9px] font-black uppercase text-slate-400 text-right">Période <span className="block text-slate-800 mt-1">{fiche.order}</span></div>
+          </div>
+          <button onClick={onOpen} className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3 group-hover:bg-indigo-700 transition-all shadow-lg active:scale-95"><Maximize2 size={16}/> Voir la Fiche</button>
         </div>
       );
     }
 
     function DashboardCard({ title, icon, active, onClick, desc, isLocked }) {
       return (
-        <button onClick={active ? onClick : null} className={`p-8 rounded-[3rem] border-2 text-left flex flex-col gap-6 relative h-full ${active ? 'bg-white border-white shadow-xl hover:-translate-y-4' : 'bg-slate-100 border-transparent opacity-40 cursor-not-allowed'}`}>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${active ? (isLocked ? 'bg-amber-100 text-amber-500' : 'bg-indigo-100 text-indigo-600') : 'bg-slate-200 text-slate-300'}`}>{icon}</div>
-          <div className="flex-1"><h3 className="text-2xl font-black uppercase flex items-center gap-3 mb-2">{title} {isLocked && <Lock className="text-amber-500 text-lg"/>}</h3><p className="text-xs text-slate-400 font-bold italic">{desc}</p></div>
-          {active && <div className="mt-auto pt-6 border-t-2 border-slate-50 flex justify-between items-center"><span className="text-[10px] font-black uppercase text-indigo-500">{isLocked ? 'Restreint' : 'Accès'}</span><div className="bg-indigo-50 p-2 rounded-full text-indigo-600"><ChevronRight /></div></div>}
+        <button onClick={active ? onClick : null} className={`p-8 rounded-[3rem] border-2 text-left flex flex-col gap-6 relative transition-all h-full ${active ? 'bg-white border-white shadow-xl hover:-translate-y-4 hover:shadow-2xl' : 'bg-slate-100 border-transparent opacity-40 cursor-not-allowed grayscale'}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner ${active ? (isLocked ? 'bg-amber-100 text-amber-500' : 'bg-indigo-100 text-indigo-600') : 'bg-slate-200 text-slate-300'}`}>{icon}</div>
+          <div className="flex-1"><h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3 mb-2">{title} {isLocked && <Lock size={18} className="text-amber-500"/>}</h3><p className="text-xs text-slate-400 font-bold leading-relaxed tracking-wide italic">{desc}</p></div>
+          {active && <div className="mt-auto pt-6 border-t-2 border-slate-50 flex items-center justify-between group"><span className="text-[10px] font-black uppercase text-indigo-500 tracking-[0.2em]">{isLocked ? 'Authentification Requise' : 'Accès Rubrique'}</span><div className="bg-indigo-50 p-2 rounded-full text-indigo-600 transition-transform group-hover:translate-x-1"><ChevronRight size={16}/></div></div>}
         </button>
       );
     }
 
     function StatBox({ label, val, max, sub, color, isBadge }) {
       return (
-        <div className="bg-slate-50 p-6 rounded-3xl border-2 flex flex-col items-center text-center"><span className="text-[9px] font-black text-slate-400 uppercase mb-2">{label}</span>{isBadge ? <span className={`text-xs font-black uppercase px-4 py-2 rounded-full bg-white ${color}`}>{val}</span> : <span className={`text-2xl font-black ${color || 'text-slate-800'}`}>{val} <span className="text-sm font-normal text-slate-300">{max}</span></span>}{sub && <span className={`text-[8px] font-black uppercase mt-1 ${color}`}>{sub}</span>}</div>
+        <div className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col items-center text-center justify-center">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none">{label}</span>
+          {isBadge ? <span className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full border shadow-sm ${color}`}>{val}</span> : <span className={`text-2xl font-black tabular-nums ${color || 'text-slate-800'}`}>{val} <span className="text-sm font-normal text-slate-300">{max}</span></span>}
+          {sub && <span className={`text-[8px] font-black uppercase mt-1 ${color}`}>{sub}</span>}
+        </div>
       );
     }
 
-    function FormInput({ label, children }) { return (<div className="flex flex-col gap-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-3">{label}</label>{children}</div>); }
+    function FormInput({ label, children }) { return (<div className="flex flex-col gap-2"><label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-3">{label}</label>{children}</div>); }
 
     function LoginView({ onLogin, onGoToRegister, msg }) {
       const [u, setU] = useState(''); const [p, setP] = useState('');
       return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6"><div className="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md"><div className="text-center mb-12"><div className="bg-indigo-600 w-20 h-20 rounded-3xl flex items-center justify-center text-white mx-auto mb-6"><ClipboardList className="text-4xl"/></div><h2 className="text-5xl font-black uppercase italic">PedagoSync</h2><p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em] mt-3">Portail Secondaire</p></div>{msg && <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase border-l-8 border-red-500 text-center">{msg.text}</div>}<div className="space-y-6"><input className="w-full p-5 bg-slate-50 rounded-2xl font-bold" placeholder="IDENTIFIANT" onChange={e => setU(e.target.value)} /><input className="w-full p-5 bg-slate-50 rounded-2xl font-bold" type="password" placeholder="MOT DE PASSE" onChange={e => setP(e.target.value)} /><button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase" onClick={() => onLogin(u, p)}>Connexion</button><button className="w-full text-slate-400 text-[10px] font-black uppercase py-4" onClick={onGoToRegister}>Créer un accès</button></div></div></div>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden"><div className="absolute w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-3xl -top-96 -left-96"></div><div className="bg-white p-12 md:p-16 rounded-[4rem] shadow-2xl w-full max-w-md relative z-10"><div className="text-center mb-12"><div className="bg-indigo-600 w-20 h-20 rounded-3xl flex items-center justify-center text-white mx-auto shadow-xl shadow-indigo-200 mb-6"><ClipboardList size={40}/></div><h2 className="text-5xl font-black text-slate-900 uppercase tracking-tighter italic">PedagoSync</h2><p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em] mt-3">Portail Secondaire</p></div>{msg && <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase border-l-8 border-red-500 text-center animate-in shake">{msg.text}</div>}<div className="space-y-6"><input className="w-full p-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-inner" placeholder="IDENTIFIANT" onChange={e => setU(e.target.value)} /><input className="w-full p-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-inner" type="password" placeholder="MOT DE PASSE" onChange={e => setP(e.target.value)} /><button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-2xl shadow-indigo-200 mt-8 hover:bg-indigo-700 active:scale-95 transition-all" onClick={() => onLogin(u, p)}>Connexion</button><button className="w-full text-slate-400 text-[10px] font-black uppercase tracking-widest py-4 hover:text-indigo-600 transition-colors" onClick={onGoToRegister}>Créer un accès</button></div></div></div>
       );
     }
 
     function RegisterView({ onRegister, onGoToLogin }) {
       const [form, setForm] = useState({ username: '', password: '', role: ROLES.PROF });
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md"><h2 className="text-4xl font-black uppercase mb-2 italic">Inscription</h2><div className="space-y-6 mt-10"><FormInput label="Nom Complet"><input className="p-4 bg-slate-50 rounded-2xl font-bold" onChange={e => setForm({...form, username: e.target.value})} /></FormInput><FormInput label="Mot de Passe"><input className="p-4 bg-slate-50 rounded-2xl font-bold" type="password" onChange={e => setForm({...form, password: e.target.value})} /></FormInput><FormInput label="Fonction"><select className="p-4 bg-white border-2 rounded-2xl font-bold" onChange={e => setForm({...form, role: e.target.value})}><option value={ROLES.PROF}>ENSEIGNANT</option><option value={ROLES.RESPONSABLE}>RESPONSABLE</option><option value={ROLES.DIRECTION}>DIRECTION</option></select></FormInput><button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase mt-8" onClick={() => onRegister(form)}>Soumettre</button><button className="w-full text-slate-400 text-[10px] font-black uppercase py-4" onClick={onGoToLogin}>Retour</button></div></div></div>
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-12 md:p-16 rounded-[4rem] shadow-2xl w-full max-w-md"><h2 className="text-4xl font-black uppercase text-slate-900 mb-2 tracking-tighter italic">Inscription</h2><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-none">Demande de création de compte</p><div className="space-y-6"><FormInput label="Nom Complet"><input className="p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-bold outline-none focus:border-indigo-500 transition-all" onChange={e => setForm({...form, username: e.target.value})} /></FormInput><FormInput label="Mot de Passe"><input className="p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 font-bold outline-none focus:border-indigo-500 transition-all" type="password" onChange={e => setForm({...form, password: e.target.value})} /></FormInput><FormInput label="Fonction Demandée"><select className="p-4 border-2 border-slate-100 rounded-2xl bg-white font-bold outline-none focus:border-indigo-500 transition-all" onChange={e => setForm({...form, role: e.target.value})}><option value={ROLES.PROF}>ENSEIGNANT</option><option value={ROLES.RESPONSABLE}>RESPONSABLE PÉDAGOGIQUE</option><option value={ROLES.DIRECTION}>DIRECTION</option></select></FormInput><button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl mt-8 hover:bg-black active:scale-95 transition-all" onClick={() => { if(!form.username || !form.password) return; onRegister(form); }}>Soumettre Demande</button><button className="w-full text-slate-400 text-[10px] font-black uppercase tracking-widest py-4 hover:text-indigo-600 transition-colors" onClick={onGoToLogin}>Retour vers Connexion</button></div></div></div>
       );
     }
 
     function AdminPasswordModal({ onConfirm, onCancel }) {
       const [p, setP] = useState("");
       return (
-        <div className="fixed inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-[200]"><div className="bg-white p-12 rounded-[4rem] text-center max-w-sm w-full"><div className="bg-amber-100 text-amber-600 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8"><Lock className="text-4xl"/></div><h3 className="text-3xl font-black uppercase mb-8">Zone Privée</h3><input type="password" autoFocus className="w-full p-6 bg-slate-50 rounded-2xl text-center font-black tracking-[0.5em] text-2xl mb-8" placeholder="••••••••" onChange={e => setP(e.target.value)} onKeyDown={e => e.key === 'Enter' && onConfirm(p)} /><div className="grid grid-cols-2 gap-4"><button className="bg-slate-100 py-5 rounded-2xl font-black uppercase text-[10px]" onClick={onCancel}>Annuler</button><button className="bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase text-[10px]" onClick={() => onConfirm(p)}>Confirmer</button></div></div></div>
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in"><div className="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-sm text-center border-t-8 border-indigo-600 animate-in zoom-in"><div className="bg-amber-100 text-amber-600 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner"><Lock size={44}/></div><h3 className="text-3xl font-black uppercase text-slate-800 mb-2 tracking-tighter">Zone Privée</h3><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-none">Authentification</p><input type="password" autoFocus className="w-full p-6 border-4 border-slate-50 bg-slate-50 rounded-2xl text-center font-black tracking-[0.5em] text-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all mb-8 shadow-inner" placeholder="••••••••" value={p} onChange={e => setP(e.target.value)} onKeyDown={e => e.key === 'Enter' && onConfirm(p)} /><div className="grid grid-cols-2 gap-4"><button className="bg-slate-100 hover:bg-slate-200 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-sm" onClick={onCancel}>Annuler</button><button className="bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-100 transition-all active:scale-95" onClick={() => onConfirm(p)}>Confirmer</button></div></div></div>
       );
     }
 
-    // --- LANCEMENT DE L'APPLICATION ---
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
