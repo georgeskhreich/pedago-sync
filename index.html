@@ -79,6 +79,7 @@
     const Calendar = (p) => <Icon name="calendar-alt" {...p} />;
     const Clock = (p) => <Icon name="clock" {...p} />;
     const Pencil = (p) => <Icon name="pencil-alt" {...p} />;
+    const Upload = (p) => <Icon name="upload" {...p} />;
 
     // --- CONSTANTES ---
     const ROLES = { ADMIN: 'Admin', RESPONSABLE: 'Responsable', PROF: 'Prof', DIRECTION: 'Direction' };
@@ -143,7 +144,7 @@
 
       const showMsg = (text, type = 'success') => {
         setMsg({ text, type });
-        setTimeout(() => setMsg(null), 3500);
+        setTimeout(() => setMsg(null), 4000);
       };
 
       useEffect(() => {
@@ -198,6 +199,27 @@
 
       const handleUpdateUser = async (userId, data) => {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), data);
+      };
+
+      // NOUVELLE FONCTION: IMPORTATION DE MASSE
+      const handleImportUsers = async (newUsers) => {
+        try {
+          for (let i = 0; i < newUsers.length; i++) {
+            const u = newUsers[i];
+            const newId = Date.now().toString() + i;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newId), {
+              username: u.username,
+              password: u.password,
+              role: u.role,
+              approved: true, // Approuvé par défaut lors de l'import
+              blocked: false
+            });
+          }
+          showMsg(`${newUsers.length} utilisateurs importés avec succès !`, "success");
+        } catch (err) {
+          console.error(err);
+          showMsg("Erreur lors de l'importation.", "error");
+        }
       };
 
       const handleAddFiche = async (fiche) => {
@@ -294,7 +316,7 @@
               </div>
             )}
 
-            {view === 'admin' && <AdminPanel users={users} onUpdateUser={handleUpdateUser} showMsg={showMsg} />}
+            {view === 'admin' && <AdminPanel users={users} onUpdateUser={handleUpdateUser} onImportUsers={handleImportUsers} showMsg={showMsg} />}
             {view === 'responsable' && <ResponsablePanel fiches={fiches} users={users} onAddFiche={handleAddFiche} onOpenFiche={setSelectedFiche} />}
             {view === 'prof' && <ProfPanel fiches={fiches} user={currentUser} users={users} onOpenFiche={setSelectedFiche} />}
             {view === 'direction' && <DirectionPanel fiches={fiches} users={users} onOpenFiche={setSelectedFiche} />}
@@ -303,21 +325,64 @@
       );
     }
 
-    // --- PANNEAU ADMIN ---
-    function AdminPanel({ users, onUpdateUser, showMsg }) {
+    // --- PANNEAU ADMIN AVEC IMPORT CSV ---
+    function AdminPanel({ users, onUpdateUser, onImportUsers, showMsg }) {
       const [editingId, setEditingId] = useState(null);
       const [tempPass, setTempPass] = useState("");
+      
       const handleSavePass = (id) => {
         if (!tempPass.trim()) return showMsg("Mot de passe vide", "error");
         onUpdateUser(id, { password: tempPass });
         setEditingId(null);
         showMsg("Mot de passe modifié.");
       };
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target.result;
+          const lines = text.split('\n');
+          const parsedUsers = [];
+          
+          for (let i = 1; i < lines.length; i++) { // i=1 pour ignorer la première ligne (l'en-tête)
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Supporte les séparateurs virgule (,) et point-virgule (;)
+            const parts = line.includes(';') ? line.split(';') : line.split(',');
+            
+            if (parts.length >= 3) {
+              parsedUsers.push({
+                username: parts[0].trim(),
+                password: parts[1].trim(),
+                role: parts[2].trim()
+              });
+            }
+          }
+          
+          if (parsedUsers.length > 0) {
+            onImportUsers(parsedUsers);
+          } else {
+            showMsg("Le fichier CSV est vide ou mal formaté.", "error");
+          }
+          e.target.value = null; // reset de l'input
+        };
+        reader.readAsText(file);
+      };
+
       return (
         <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200">
-          <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+          <div className="p-8 bg-slate-900 text-white flex flex-col md:flex-row justify-between items-center gap-4">
             <h2 className="text-2xl font-black uppercase tracking-tighter italic">Gestion des comptes</h2>
-            <div className="bg-indigo-50 text-[10px] font-bold px-3 py-1 rounded-full uppercase text-indigo-700">{users.length} Utilisateurs</div>
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-50 text-[10px] font-bold px-3 py-1 rounded-full uppercase text-indigo-700">{users.length} Utilisateurs</div>
+              <label className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-emerald-100 cursor-pointer transition-all flex items-center gap-2">
+                <Upload size={14} /> Importer CSV
+                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+              </label>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
