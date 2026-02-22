@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PedagoSync - Cycle Secondaire</title>
+  
+  <!-- Tailwind CSS pour le design -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome pour les icônes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React & Babel pour faire fonctionner l'application dans le navigateur -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Personnalisation de la barre de défilement */
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+  
+  <div id="root"></div>
+
+  <!-- LE CODE DE L'APPLICATION -->
+  <script type="text/babel" data-type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const { useState, useEffect } = React;
+
+    // --- CONFIGURATION FIREBASE ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5XiOxybp_1pWhUXE0JM5XqpfEelLKNwc",
+      authDomain: "sscc-visite-de-classe.firebaseapp.com",
+      projectId: "sscc-visite-de-classe",
+      storageBucket: "sscc-visite-de-classe.firebasestorage.app",
+      messagingSenderId: "388588176034",
+      appId: "1:388588176034:web:86c4db3ad017454ae64dfb"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = "sscc-visite-de-classe";
+
+    // --- ICÔNES (Remplacement de Lucide par FontAwesome pour un seul fichier) ---
+    const Icon = ({ name, size, className }) => <i className={`fas fa-${name} ${className || ''}`} style={size ? { fontSize: size } : {}}></i>;
+    const UserCheck = (p) => <Icon name="user-check" {...p} />;
+    const Users = (p) => <Icon name="users" {...p} />;
+    const ShieldCheck = (p) => <Icon name="shield-alt" {...p} />;
+    const PlusCircle = (p) => <Icon name="plus-circle" {...p} />;
+    const FileText = (p) => <Icon name="file-alt" {...p} />;
+    const MessageSquare = (p) => <Icon name="comment-alt" {...p} />;
+    const Eye = (p) => <Icon name="eye" {...p} />;
+    const EyeOff = (p) => <Icon name="eye-slash" {...p} />;
+    const CheckCircle = (p) => <Icon name="check-circle" {...p} />;
+    const XCircle = (p) => <Icon name="times-circle" {...p} />;
+    const LogOut = (p) => <Icon name="sign-out-alt" {...p} />;
+    const ChevronRight = (p) => <Icon name="chevron-right" {...p} />;
+    const ClipboardList = (p) => <Icon name="clipboard-list" {...p} />;
+    const UserCog = (p) => <Icon name="user-cog" {...p} />;
+    const Lock = (p) => <Icon name="lock" {...p} />;
+    const Unlock = (p) => <Icon name="unlock" {...p} />;
+    const Ban = (p) => <Icon name="ban" {...p} />;
+    const Key = (p) => <Icon name="key" {...p} />;
+    const Save = (p) => <Icon name="save" {...p} />;
+    const Maximize2 = (p) => <Icon name="expand-arrows-alt" {...p} />;
+    const Info = (p) => <Icon name="info-circle" {...p} />;
+    const History = (p) => <Icon name="history" {...p} />;
+    const Calendar = (p) => <Icon name="calendar-alt" {...p} />;
+    const Clock = (p) => <Icon name="clock" {...p} />;
+    const Pencil = (p) => <Icon name="pencil-alt" {...p} />;
+
+    // --- CONSTANTES ---
+    const ROLES = { ADMIN: 'Admin', RESPONSABLE: 'Responsable', PROF: 'Prof', DIRECTION: 'Direction' };
+    const ADMIN_SECRET_PASSWORD = "@1234567890";
+    const PERIODES = ["Période 1", "Période 2", "Période 3", "Période 4", "Période 5", "Période 6", "Période 7"];
+
+    const CRITERIA = [
+      { id: 'planification', title: 'I. PLANIFICATION', max: 20, items: [{ label: 'Programmation annuelle disponible et à jour', max: 5 }, { label: 'Fiche de préparation détaillée', max: 5 }, { label: 'Objectifs formulés clairement', max: 5 }, { label: 'Cohérence séance – progression annuelle', max: 5 }] },
+      { id: 'maitrise', title: 'II. MAÎTRISE DISCIPLINAIRE', max: 20, items: [{ label: 'Exactitude scientifique / linguistique', max: 10 }, { label: 'Richesse du contenu et exemples pertinents', max: 5 }, { label: 'Réponses pertinentes aux questions', max: 5 }] },
+      { id: 'demarche', title: 'III. DÉMARCHE PÉDAGOGIQUE', max: 25, items: [{ label: 'Méthodologie adaptée au secondaire', max: 5 }, { label: 'Progression logique de la séance', max: 5 }, { label: 'Diversité des stratégies', max: 5 }, { label: 'Implication des élèves', max: 5 }, { label: 'Vérification des acquis en fin de séance', max: 5 }] },
+      { id: 'gestion', title: 'IV. GESTION DE CLASSE', max: 15, items: [{ label: 'Climat de respect et autorité pédagogique', max: 5 }, { label: 'Gestion du temps', max: 5 }, { label: 'Discipline et organisation', max: 5 }] },
+      { id: 'evaluation', title: 'V. ÉVALUATION ET DIFFÉRENCIATION', max: 20, items: [{ label: 'Questions stimulantes et pertinentes', max: 5 }, { label: 'Adaptation aux différents niveaux', max: 5 }, { label: 'Encouragement et motivation', max: 5 }, { label: 'Feedback constructif', max: 5 }] }
+    ];
+
+    const getAppreciation = (score) => {
+      if (score >= 90) return { label: 'Excellent', color: 'text-emerald-600', bg: 'bg-emerald-50' };
+      if (score >= 75) return { label: 'Très satisfaisant', color: 'text-blue-600', bg: 'bg-blue-50' };
+      if (score >= 60) return { label: 'Satisfaisant', color: 'text-amber-600', bg: 'bg-amber-50' };
+      return { label: 'À accompagner', color: 'text-red-600', bg: 'bg-red-50' };
+    };
+
+    // --- COMPOSANT PRINCIPAL APP ---
+    function App() {
+      const [fbUser, setFbUser] = useState(null);
+      const [currentUser, setCurrentUser] = useState(null);
+      const [view, setView] = useState('login'); 
+      const [users, setUsers] = useState([]);
+      const [fiches, setFiches] = useState([]);
+      const [msg, setMsg] = useState(null);
+      const [showAdminAuth, setShowAdminAuth] = useState(false);
+      const [selectedFiche, setSelectedFiche] = useState(null);
+      const [loadingData, setLoadingData] = useState(true);
+
+      const showMsg = (text, type = 'success') => {
+        setMsg({ text, type });
+        setTimeout(() => setMsg(null), 3500);
+      };
+
+      useEffect(() => {
+        const initAuth = async () => {
+          try { await signInAnonymously(auth); } 
+          catch (err) { console.error("Erreur Auth", err); setLoadingData(false); }
+        };
+        initAuth();
+        const unsubscribe = onAuthStateChanged(auth, setFbUser);
+        return () => unsubscribe();
+      }, []);
+
+      useEffect(() => {
+        if (!fbUser) return;
+        const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+        const unsubUsers = onSnapshot(usersRef, (snapshot) => {
+          const usersData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (usersData.length === 0) {
+            setDoc(doc(usersRef, '1'), { username: 'admin', password: '1234', role: ROLES.ADMIN, approved: true, blocked: false });
+            setDoc(doc(usersRef, '2'), { username: 'directeur', password: '123', role: ROLES.DIRECTION, approved: true, blocked: false });
+            setDoc(doc(usersRef, '3'), { username: 'responsable', password: '123', role: ROLES.RESPONSABLE, approved: true, blocked: false });
+            setDoc(doc(usersRef, '4'), { username: 'prof', password: '123', role: ROLES.PROF, approved: true, blocked: false });
+          } else {
+            setUsers(usersData);
+            setLoadingData(false);
+          }
+        }, (err) => { console.error(err); setLoadingData(false); });
+
+        const fichesRef = collection(db, 'artifacts', appId, 'public', 'data', 'fiches');
+        const unsubFiches = onSnapshot(fichesRef, (snapshot) => {
+          setFiches(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        }, (err) => console.error(err));
+
+        return () => { unsubUsers(); unsubFiches(); };
+      }, [fbUser]);
+
+      const handleLogin = (u, p) => {
+        const user = users.find(usr => usr.username === u && usr.password === p);
+        if (!user) return showMsg("Identifiants incorrects", "error");
+        if (user.blocked) return showMsg("Accès refusé : compte bloqué.", "error");
+        if (!user.approved && user.role !== ROLES.ADMIN) return showMsg("Compte en attente.", "error");
+        setCurrentUser(user);
+        setView('home');
+      };
+
+      const handleRegister = async (u) => {
+        const newId = Date.now().toString();
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newId), { ...u, approved: false, blocked: false });
+        setView('login');
+        showMsg("Demande d'inscription envoyée.", "info");
+      };
+
+      const handleUpdateUser = async (userId, data) => {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), data);
+      };
+
+      const handleAddFiche = async (fiche) => {
+        const newId = Date.now().toString();
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', newId), { ...fiche, responsableId: currentUser.id, profComments: [], directionRemarks: [] });
+        showMsg("Fiche validée et enregistrée.");
+        setView('home');
+      };
+
+      const addProfComment = async (ficheId, text) => {
+        const fiche = fiches.find(f => f.id === ficheId);
+        if(!fiche) return;
+        const newComments = [...fiche.profComments, { text, date: new Date().toLocaleString() }];
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { profComments: newComments });
+        showMsg("Explication transmise.");
+      };
+
+      const editProfComment = async (ficheId, commentIndex, newText) => {
+        const fiche = fiches.find(f => f.id === ficheId);
+        if(!fiche) return;
+        const updatedComments = [...fiche.profComments];
+        updatedComments[commentIndex] = { ...updatedComments[commentIndex], text: newText, date: new Date().toLocaleString() + ' (modifié)' };
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { profComments: updatedComments });
+        showMsg("Explication modifiée.");
+      };
+
+      const addDirectionRemark = async (ficheId, text) => {
+        const fiche = fiches.find(f => f.id === ficheId);
+        if(!fiche) return;
+        const newRemarks = [...fiche.directionRemarks, { text, date: new Date().toLocaleString() }];
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { directionRemarks: newRemarks });
+        showMsg("Remarque enregistrée.");
+      };
+
+      const editDirectionRemark = async (ficheId, remarkIndex, newText) => {
+        const fiche = fiches.find(f => f.id === ficheId);
+        if(!fiche) return;
+        const updatedRemarks = [...fiche.directionRemarks];
+        updatedRemarks[remarkIndex] = { ...updatedRemarks[remarkIndex], text: newText, date: new Date().toLocaleString() + ' (modifié)' };
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fiches', ficheId), { directionRemarks: updatedRemarks });
+        showMsg("Remarque modifiée.");
+      };
+
+      if (loadingData) {
+        return (
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+            <div className="animate-spin text-indigo-500 mb-6"><ClipboardList size={64} /></div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest animate-pulse italic">Connexion au Cloud...</h2>
+            <p className="text-slate-400 text-xs mt-3 uppercase tracking-widest">Synchronisation en cours</p>
+          </div>
+        );
+      }
+
+      if (!currentUser && view !== 'register') return <LoginView onLogin={handleLogin} onGoToRegister={() => setView('register')} msg={msg} />;
+      if (view === 'register') return <RegisterView onRegister={handleRegister} onGoToLogin={() => setView('login')} />;
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+          {showAdminAuth && <AdminPasswordModal onConfirm={(p) => p === ADMIN_SECRET_PASSWORD ? (setShowAdminAuth(false), setView('admin')) : showMsg("Code incorrect", "error")} onCancel={() => setShowAdminAuth(false)} />}
+          
+          {selectedFiche && <FicheDetailModal fiche={selectedFiche} user={currentUser} users={users} onClose={() => setSelectedFiche(null)} onAddProfComment={addProfComment} onEditProfComment={editProfComment} onAddDirRemark={addDirectionRemark} onEditDirRemark={editDirectionRemark} />}
+
+          <header className="bg-indigo-800 text-white p-4 shadow-xl flex justify-between items-center sticky top-0 z-40">
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
+              <div className="bg-white/20 p-2 rounded-xl group-hover:bg-white/30 transition-colors"><ClipboardList size={24} /></div>
+              <h1 className="text-xl font-black tracking-tighter uppercase italic">Pedago<span className="text-indigo-300">Sync</span> <span className="text-[10px] bg-green-500 px-2 py-0.5 rounded-full not-italic tracking-normal ml-2">Cloud</span></h1>
+            </div>
+            <div className="flex items-center gap-5">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold leading-none">{currentUser.username}</p>
+                <p className="text-[10px] text-indigo-200 uppercase tracking-widest font-black mt-1">{currentUser.role}</p>
+              </div>
+              <button onClick={() => { setCurrentUser(null); setView('login'); }} className="p-2.5 bg-indigo-700 hover:bg-red-500 rounded-full transition-all shadow-inner"><LogOut size={18} /></button>
+            </div>
+          </header>
+
+          <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+            {msg && (
+              <div className={`mb-8 p-4 rounded-2xl flex items-center gap-3 shadow-lg animate-in slide-in-from-top duration-300 border-l-8 ${msg.type === 'error' ? 'bg-red-50 text-red-700 border-red-500' : 'bg-emerald-50 text-emerald-700 border-emerald-500'}`}>
+                {msg.type === 'error' ? <XCircle className="text-xl" /> : <CheckCircle className="text-xl" />}
+                <span className="font-bold text-sm uppercase tracking-tight">{msg.text}</span>
+              </div>
+            )}
+
+            {view === 'home' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-4">
+                <DashboardCard title="Responsable" icon={<Users size={32}/>} active={currentUser.role === ROLES.RESPONSABLE} onClick={() => setView('responsable')} desc="Évaluer, noter et commenter les séances." />
+                <DashboardCard title="Professeur" icon={<FileText size={32}/>} active={currentUser.role === ROLES.PROF} onClick={() => setView('prof')} desc="Consulter mes fiches et apporter des précisions." />
+                <DashboardCard title="Direction" icon={<ShieldCheck size={32}/>} active={currentUser.role === ROLES.DIRECTION} onClick={() => setView('direction')} desc="Superviser l'ensemble des rapports." />
+                <DashboardCard title="Admin" icon={<UserCog size={32}/>} active={true} onClick={() => currentUser.role === ROLES.ADMIN ? setView('admin') : setShowAdminAuth(true)} desc="Gestion des accès et utilisateurs." isLocked={currentUser.role !== ROLES.ADMIN} />
+              </div>
+            )}
+
+            {view === 'admin' && <AdminPanel users={users} onUpdateUser={handleUpdateUser} showMsg={showMsg} />}
+            {view === 'responsable' && <ResponsablePanel fiches={fiches} users={users} onAddFiche={handleAddFiche} onOpenFiche={setSelectedFiche} />}
+            {view === 'prof' && <ProfPanel fiches={fiches} user={currentUser} users={users} onOpenFiche={setSelectedFiche} />}
+            {view === 'direction' && <DirectionPanel fiches={fiches} users={users} onOpenFiche={setSelectedFiche} />}
+          </main>
+        </div>
+      );
+    }
+
+    // --- SOUS-COMPOSANTS UI ---
+    function AdminPanel({ users, onUpdateUser, showMsg }) {
+      const [editingId, setEditingId] = useState(null);
+      const [tempPass, setTempPass] = useState("");
+      const handleSavePass = (id) => {
+        if (!tempPass.trim()) return showMsg("Mot de passe vide", "error");
+        onUpdateUser(id, { password: tempPass });
+        setEditingId(null);
+        showMsg("Mot de passe modifié.");
+      };
+      return (
+        <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200">
+          <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+            <h2 className="text-2xl font-black uppercase tracking-tighter italic">Gestion des comptes</h2>
+            <div className="bg-indigo-50 text-[10px] font-bold px-3 py-1 rounded-full uppercase text-indigo-700">{users.length} Utilisateurs</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead><tr className="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><th className="px-8 py-5">Utilisateur</th><th className="px-8 py-5">Mot de Passe</th><th className="px-8 py-5">Statut</th><th className="px-8 py-5 text-center">Actions</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.map(u => (
+                  <tr key={u.id} className={u.blocked ? 'bg-red-50/50' : 'hover:bg-slate-50/50'}>
+                    <td className="px-8 py-6"><span className="font-black text-slate-800 uppercase block">{u.username}</span><span className="text-[9px] font-bold text-indigo-500 mt-1 uppercase tracking-widest">{u.role}</span></td>
+                    <td className="px-8 py-6">
+                      {editingId === u.id ? (
+                        <div className="flex gap-2"><input className="p-2 border rounded-lg text-xs font-mono w-32" value={tempPass} onChange={e => setTempPass(e.target.value)} /><button onClick={() => handleSavePass(u.id)} className="p-2 bg-emerald-500 text-white rounded-lg"><Save size={14}/></button><button onClick={() => setEditingId(null)} className="p-2 bg-slate-200 rounded-lg"><XCircle size={14}/></button></div>
+                      ) : (
+                        <div className="flex items-center gap-3 group"><code className="bg-slate-100 px-3 py-1 rounded text-sm font-mono border font-bold">{u.password}</code><button className="text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingId(u.id); setTempPass(u.password); }}><Key size={14}/></button></div>
+                      )}
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col gap-1">
+                        {!u.approved && <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest"><History size={10}/> En attente</span>}
+                        {u.blocked && <span className="text-[9px] font-black text-red-600 uppercase tracking-widest"><Ban size={10}/> Bloqué</span>}
+                        {u.approved && !u.blocked && <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest"><CheckCircle size={10}/> Actif</span>}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-center">
+                      <div className="flex justify-center gap-3">
+                        {!u.approved && <button className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase" onClick={() => onUpdateUser(u.id, { approved: true })}>Approuver</button>}
+                        {u.id !== '1' && <button className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${u.blocked ? 'bg-indigo-600 text-white' : 'bg-red-100 text-red-600'}`} onClick={() => onUpdateUser(u.id, { blocked: !u.blocked })}>{u.blocked ? "Réactiver" : "Bloquer"}</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function ResponsablePanel({ fiches, users, onAddFiche, onOpenFiche }) {
+      const [creating, setCreating] = useState(false);
+      const [groupBy, setGroupBy] = useState('prof');
+      const [formData, setFormData] = useState({ profId: '', class: '', subject: '', date: new Date().toISOString().split('T')[0], order: 'Période 1', scores: {}, sectionComments: {}, finalComment: '' });
+      const profs = users.filter(u => u.role === ROLES.PROF);
+      const total = Object.values(formData.scores).reduce((a, b) => a + (Number(b) || 0), 0);
+      const appreciation = getAppreciation(total);
+
+      if (creating) {
+        return (
+          <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden max-w-5xl mx-auto border border-slate-200">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shadow-lg"><h2 className="text-2xl font-black uppercase tracking-widest italic">Nouvelle Évaluation</h2><button onClick={() => setCreating(false)} className="bg-white/10 p-2 rounded-full"><XCircle /></button></div>
+            <div className="p-10 space-y-12 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
+                <FormInput label="Enseignant observé"><select className="p-3 border-2 border-slate-200 rounded-2xl w-full bg-white font-bold" value={formData.profId} onChange={e => setFormData({...formData, profId: e.target.value})}><option value="">Sélectionner...</option>{profs.map(p => <option key={p.id} value={p.id}>{p.username}</option>)}</select></FormInput>
+                <FormInput label="Classe"><input className="p-3 border-2 border-slate-200 rounded-2xl w-full font-bold" placeholder="ex: 3ème B" onChange={e => setFormData({...formData, class: e.target.value})} /></FormInput>
+                <FormInput label="Matière"><input className="p-3 border-2 border-slate-200 rounded-2xl w-full font-bold" placeholder="ex: Français" onChange={e => setFormData({...formData, subject: e.target.value})} /></FormInput>
+                <FormInput label="Date"><div className="relative"><Calendar className="absolute left-3 top-3.5 text-slate-400" size={18} /><input type="date" className="p-3 pl-10 border-2 rounded-2xl w-full font-bold" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div></FormInput>
+                <FormInput label="Période"><div className="relative"><Clock className="absolute left-3 top-3.5 text-slate-400" size={18} /><select className="p-3 pl-10 border-2 rounded-2xl w-full font-bold" value={formData.order} onChange={e => setFormData({...formData, order: e.target.value})}>{PERIODES.map(p => <option key={p} value={p}>{p}</option>)}</select></div></FormInput>
+              </div>
+              <div className="space-y-12">
+                {CRITERIA.map(cat => (
+                  <div key={cat.id} className="border-2 border-slate-100 rounded-[3rem] overflow-hidden shadow-sm">
+                    <div className="bg-indigo-700 text-white px-10 py-5 flex justify-between items-center uppercase tracking-widest text-xs font-black"><span>{cat.title}</span><span className="bg-indigo-900/40 px-4 py-1 rounded-full">Barème: {cat.max} pts</span></div>
+                    <div className="p-10 space-y-6 bg-white">
+                      {cat.items.map((item, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row justify-between gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-indigo-100"><span className="text-sm font-bold text-slate-700">{item.label}</span><div className="flex items-center gap-3"><input type="number" max={item.max} min="0" className="w-20 p-3 border-2 rounded-xl text-center font-black" onChange={(e) => setFormData({...formData, scores: {...formData.scores, [`${cat.id}_${idx}`]: Math.min(item.max, Math.max(0, e.target.value))}})} /><span className="text-slate-400 font-bold text-xs">/ {item.max}</span></div></div>
+                      ))}
+                      <div className="mt-8"><label className="text-[10px] font-black uppercase text-indigo-400 block mb-3 ml-4 italic">Commentaires spécifiques</label><textarea className="w-full p-5 border-2 rounded-3xl text-sm bg-slate-50" placeholder="Observations..." rows="3" onChange={e => setFormData({...formData, sectionComments: {...formData.sectionComments, [cat.id]: e.target.value}})} /></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-10 bg-slate-900 text-white rounded-[3.5rem] shadow-2xl border-t-8 border-indigo-500"><h3 className="text-xl font-black uppercase mb-6 flex items-center gap-3 italic"><FileText className="text-indigo-400"/> Conclusion</h3><textarea className="w-full p-6 border-2 border-slate-700 bg-slate-800 rounded-3xl" rows="6" onChange={e => setFormData({...formData, finalComment: e.target.value})} /></div>
+              <div className="bg-indigo-700 text-white p-10 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl"><div className="text-center md:text-left"><p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.3em] mb-2 leading-none">Total points</p><div className="text-6xl font-black tabular-nums">{total} <span className="text-2xl text-indigo-300 font-normal">/ 100</span></div><p className={`mt-2 font-black uppercase tracking-tighter text-lg ${appreciation.color}`}>{appreciation.label}</p></div><button className="bg-white text-indigo-700 px-16 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl disabled:opacity-50" disabled={!formData.profId} onClick={() => onAddFiche(formData)}>Valider & Publier</button></div>
+            </div>
+          </div>
+        );
+      }
+
+      const groupedFiches = fiches.reduce((acc, f) => { let key = groupBy === 'prof' ? users.find(u => u.id === f.profId)?.username : f.class; key = key || 'Autre'; if (!acc[key]) acc[key] = []; acc[key].push(f); return acc; }, {});
+
+      return (
+        <div className="space-y-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4"><h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Visites de classe</h2><button onClick={() => setCreating(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-3"><PlusCircle size={24}/> Créer fiche</button></div>
+          {fiches.length > 0 && (<div className="flex gap-2 bg-slate-200 p-1 rounded-2xl w-fit mx-auto md:mx-0"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'prof' ? 'bg-white text-indigo-700' : 'text-slate-500'}`}>Par Professeur</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'class' ? 'bg-white text-indigo-700' : 'text-slate-500'}`}>Par Classe</button></div>)}
+          {fiches.length === 0 ? (<div className="py-32 text-center bg-white rounded-[4rem] border-4 border-dashed border-slate-100"><p className="text-slate-300 font-black uppercase">Aucune évaluation</p></div>) : (<div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase border-b-4 border-indigo-100 pb-2 inline-block">{key} <span className="text-sm bg-indigo-50 px-3 py-1 rounded-xl ml-3">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>)}
+        </div>
+      );
+    }
+
+    function ProfPanel({ fiches, user, users, onOpenFiche }) {
+      const myFiches = fiches.filter(f => f.profId === user.id);
+      return (
+        <div className="space-y-8"><h2 className="text-3xl font-black text-slate-900 uppercase italic">Mes Observations</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{myFiches.map(f => <FicheCard key={f.id} fiche={f} profName={user.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}{myFiches.length === 0 && <div className="col-span-full py-32 text-center bg-white rounded-[4rem] border-2 border-dashed">Aucune fiche.</div>}</div></div>
+      );
+    }
+
+    function DirectionPanel({ fiches, users, onOpenFiche }) {
+      const [groupBy, setGroupBy] = useState('prof');
+      const groupedFiches = fiches.reduce((acc, f) => { let key = groupBy === 'prof' ? users.find(u => u.id === f.profId)?.username : (groupBy === 'class' ? f.class : users.find(u => u.id === f.responsableId)?.username); key = key || 'Autre'; if (!acc[key]) acc[key] = []; acc[key].push(f); return acc; }, {});
+      return (
+        <div className="space-y-8"><h2 className="text-3xl font-black text-slate-900 uppercase italic">Supervision</h2>
+          {fiches.length > 0 && (<div className="flex gap-2 bg-slate-200 p-1 rounded-2xl w-fit"><button onClick={() => setGroupBy('prof')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'prof' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Prof</button><button onClick={() => setGroupBy('class')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'class' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Classe</button><button onClick={() => setGroupBy('responsable')} className={`px-6 py-3 text-xs font-black uppercase rounded-xl ${groupBy === 'responsable' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>Par Resp.</button></div>)}
+          <div className="space-y-10">{Object.entries(groupedFiches).map(([key, group]) => (<div key={key} className="space-y-6"><h3 className="text-2xl font-black text-slate-800 uppercase border-b-4 border-amber-100 pb-2 inline-block">{key} <span className="text-sm bg-amber-50 px-3 py-1 rounded-xl ml-3">{group.length}</span></h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{group.map(f => <FicheCard key={f.id} fiche={f} profName={users.find(u => u.id === f.profId)?.username} responsableName={users.find(u => u.id === f.responsableId)?.username} total={Object.values(f.scores).reduce((a,b)=>a+(Number(b)||0),0)} onOpen={() => onOpenFiche(f)} />)}</div></div>))}</div>
+        </div>
+      );
+    }
+
+    function FicheDetailModal({ fiche, user, users, onClose, onAddProfComment, onEditProfComment, onAddDirRemark, onEditDirRemark }) {
+      const prof = users.find(u => u.id === fiche.profId);
+      const responsable = users.find(u => u.id === fiche.responsableId);
+      const total = Object.values(fiche.scores).reduce((a, b) => a + (Number(b) || 0), 0);
+      const app = getAppreciation(total);
+      const [commentText, setCommentText] = useState("");
+      const [editingProfIdx, setEditingProfIdx] = useState(null);
+      const [editProfText, setEditProfText] = useState("");
+      const [editingDirIdx, setEditingDirIdx] = useState(null);
+      const [editDirText, setEditDirText] = useState("");
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-8 bg-indigo-700 text-white flex justify-between items-center shadow-lg"><div><h2 className="text-3xl font-black uppercase italic">Fiche Officielle</h2><div className="flex gap-4 mt-2"><span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{prof?.username}</span><span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{fiche.class}</span></div></div><button onClick={onClose} className="bg-white text-indigo-700 p-3 rounded-2xl hover:bg-red-500 hover:text-white"><XCircle className="text-xl" /></button></div>
+            <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
+              <div className="grid grid-cols-4 gap-6"><StatBox label="Note Finale" val={total} max="/ 100" color={app.color} /><StatBox label="Date" val={new Date(fiche.date).toLocaleDateString()} /><StatBox label="Période" val={fiche.order} /><StatBox label="Appréciation" val={app.label} isBadge color={app.color} /></div>
+              <div className="space-y-10">
+                {CRITERIA.map(cat => (
+                  <div key={cat.id} className="border-2 border-slate-100 rounded-[2.5rem] overflow-hidden"><div className="bg-slate-900 text-white px-8 py-4 flex justify-between"><h3 className="font-black text-sm uppercase">{cat.title}</h3><span className="text-indigo-400 font-black">{cat.items.reduce((acc, _, idx) => acc + (fiche.scores[`${cat.id}_${idx}`] || 0), 0)} / {cat.max}</span></div><div className="p-8 space-y-4">{cat.items.map((item, idx) => (<div key={idx} className="flex justify-between border-b pb-3 text-sm"><span className="text-slate-600 font-medium">{item.label}</span><span className="font-black bg-slate-100 px-3 py-1 rounded-lg">{fiche.scores[`${cat.id}_${idx}`] || 0} / {item.max}</span></div>))}<div className="mt-6 p-5 bg-indigo-50 rounded-2xl"><p className="text-[10px] font-black text-indigo-400 uppercase mb-2">Observation</p><p className="text-sm italic">{fiche.sectionComments?.[cat.id] || "Aucune"}</p></div></div></div>
+                ))}
+              </div>
+              <div className="bg-slate-900 text-white p-10 rounded-[3rem] border-t-8 border-indigo-500"><h3 className="text-2xl font-black uppercase mb-6 italic">Conclusion Générale</h3><p className="text-slate-300 italic text-lg">{fiche.finalComment || "Aucune"}</p></div>
+              <div className="grid grid-cols-2 gap-12 pt-8 border-t-2">
+                <div className="space-y-6"><h4 className="text-lg font-black uppercase flex items-center gap-3 text-indigo-600">Réponses Prof</h4><div className="space-y-4 max-h-64 overflow-y-auto">{fiche.profComments.map((c, i) => (<div key={i} className="p-5 bg-white border rounded-3xl text-sm relative group">{editingProfIdx === i ? (<div className="space-y-3"><textarea className="w-full p-3 border-2 rounded-xl" rows="3" value={editProfText} onChange={e => setEditProfText(e.target.value)} /><div className="flex gap-2"><button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditProfComment(fiche.id, i, editProfText); setEditingProfIdx(null); }}>Enregistrer</button></div></div>) : (<><p className="italic">"{c.text}"</p><span className="block text-[9px] font-black text-slate-400 mt-3">— {c.date}</span>{user.role === ROLES.PROF && user.id === fiche.profId && (<button className="absolute top-4 right-4 text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingProfIdx(i); setEditProfText(c.text); }}><Pencil /></button>)}</>)}</div>))}{fiche.profComments.length === 0 && <p className="text-xs text-center border-2 border-dashed rounded-3xl py-6">Aucune explication.</p>}</div>{user.role === ROLES.PROF && user.id === fiche.profId && (<div className="bg-indigo-50 p-6 rounded-[2rem]"><textarea className="w-full p-4 border-2 rounded-2xl text-sm" rows="3" value={commentText} onChange={e => setCommentText(e.target.value)} /><button className="w-full bg-indigo-600 text-white py-4 rounded-2xl text-xs font-black mt-3" onClick={() => { if(commentText) onAddProfComment(fiche.id, commentText); setCommentText(""); }}>Ajouter</button></div>)}</div>
+                <div className="space-y-6"><h4 className="text-lg font-black uppercase flex items-center gap-3 text-amber-600">Remarques Direction</h4><div className="space-y-4 max-h-64 overflow-y-auto">{fiche.directionRemarks.map((r, i) => (<div key={i} className="p-5 bg-amber-50 border border-amber-100 rounded-3xl text-sm relative group">{editingDirIdx === i ? (<div className="space-y-3"><textarea className="w-full p-3 border-2 border-amber-200 rounded-xl" rows="3" value={editDirText} onChange={e => setEditDirText(e.target.value)} /><div className="flex gap-2"><button className="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold" onClick={() => { onEditDirRemark(fiche.id, i, editDirText); setEditingDirIdx(null); }}>Enregistrer</button></div></div>) : (<><p>"{r.text}"</p><span className="block text-[9px] font-black text-amber-500 mt-3">— {r.date}</span>{user.role === ROLES.DIRECTION && (<button className="absolute top-4 right-4 text-amber-300 hover:text-amber-600 opacity-0 group-hover:opacity-100" onClick={() => { setEditingDirIdx(i); setEditDirText(r.text); }}><Pencil /></button>)}</>)}</div>))}{fiche.directionRemarks.length === 0 && <p className="text-xs text-center border-2 border-dashed rounded-3xl py-6">Aucune remarque.</p>}</div>{user.role === ROLES.DIRECTION && (<div className="bg-amber-50 p-6 rounded-[2rem]"><textarea className="w-full p-4 border-2 rounded-2xl text-sm border-white" rows="3" value={commentText} onChange={e => setCommentText(e.target.value)} /><button className="w-full bg-amber-500 text-white py-4 rounded-2xl text-xs font-black mt-3" onClick={() => { if(commentText) onAddDirRemark(fiche.id, commentText); setCommentText(""); }}>Ajouter</button></div>)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function FicheCard({ fiche, profName, responsableName, total, onOpen }) {
+      const app = getAppreciation(total);
+      return (
+        <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-100 relative overflow-hidden group">
+          <div className={`absolute top-0 right-0 w-32 h-32 ${app.bg} rounded-bl-[6rem] -mr-8 -mt-8 opacity-40 transition-transform group-hover:scale-110`}></div>
+          <div className="flex justify-between items-start mb-8 relative z-10"><div><h3 className="font-black uppercase text-xl">{profName}</h3><p className="text-[10px] font-black text-indigo-500 mt-2 uppercase">{fiche.subject}</p>{responsableName && <p className="text-[9px] font-black text-slate-400 mt-3 uppercase flex items-center gap-1.5"><UserCheck className="text-[10px] text-indigo-400"/> par {responsableName}</p>}</div><div className="text-right"><span className={`text-3xl font-black ${app.color}`}>{total}</span><p className={`text-[8px] font-black uppercase mt-1 ${app.color}`}>{app.label}</p></div></div>
+          <div className="flex gap-4 mb-8 bg-slate-50 p-4 rounded-2xl relative z-10"><div className="flex-1 text-[9px] font-black uppercase text-slate-400">Classe <span className="block text-slate-800 mt-1">{fiche.class}</span></div><div className="flex-1 text-[9px] font-black uppercase text-slate-400 text-right">Période <span className="block text-slate-800 mt-1">{fiche.order}</span></div></div>
+          <button onClick={onOpen} className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase flex justify-center gap-3 relative z-10 hover:bg-indigo-700"><Maximize2 /> Détails & Échanges</button>
+        </div>
+      );
+    }
+
+    function DashboardCard({ title, icon, active, onClick, desc, isLocked }) {
+      return (
+        <button onClick={active ? onClick : null} className={`p-8 rounded-[3rem] border-2 text-left flex flex-col gap-6 relative h-full ${active ? 'bg-white border-white shadow-xl hover:-translate-y-4' : 'bg-slate-100 border-transparent opacity-40 cursor-not-allowed'}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${active ? (isLocked ? 'bg-amber-100 text-amber-500' : 'bg-indigo-100 text-indigo-600') : 'bg-slate-200 text-slate-300'}`}>{icon}</div>
+          <div className="flex-1"><h3 className="text-2xl font-black uppercase flex items-center gap-3 mb-2">{title} {isLocked && <Lock className="text-amber-500 text-lg"/>}</h3><p className="text-xs text-slate-400 font-bold italic">{desc}</p></div>
+          {active && <div className="mt-auto pt-6 border-t-2 border-slate-50 flex justify-between items-center"><span className="text-[10px] font-black uppercase text-indigo-500">{isLocked ? 'Restreint' : 'Accès'}</span><div className="bg-indigo-50 p-2 rounded-full text-indigo-600"><ChevronRight /></div></div>}
+        </button>
+      );
+    }
+
+    function StatBox({ label, val, max, sub, color, isBadge }) {
+      return (
+        <div className="bg-slate-50 p-6 rounded-3xl border-2 flex flex-col items-center text-center"><span className="text-[9px] font-black text-slate-400 uppercase mb-2">{label}</span>{isBadge ? <span className={`text-xs font-black uppercase px-4 py-2 rounded-full bg-white ${color}`}>{val}</span> : <span className={`text-2xl font-black ${color || 'text-slate-800'}`}>{val} <span className="text-sm font-normal text-slate-300">{max}</span></span>}{sub && <span className={`text-[8px] font-black uppercase mt-1 ${color}`}>{sub}</span>}</div>
+      );
+    }
+
+    function FormInput({ label, children }) { return (<div className="flex flex-col gap-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-3">{label}</label>{children}</div>); }
+
+    function LoginView({ onLogin, onGoToRegister, msg }) {
+      const [u, setU] = useState(''); const [p, setP] = useState('');
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6"><div className="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md"><div className="text-center mb-12"><div className="bg-indigo-600 w-20 h-20 rounded-3xl flex items-center justify-center text-white mx-auto mb-6"><ClipboardList className="text-4xl"/></div><h2 className="text-5xl font-black uppercase italic">PedagoSync</h2><p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em] mt-3">Portail Secondaire</p></div>{msg && <div className="mb-8 p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase border-l-8 border-red-500 text-center">{msg.text}</div>}<div className="space-y-6"><input className="w-full p-5 bg-slate-50 rounded-2xl font-bold" placeholder="IDENTIFIANT" onChange={e => setU(e.target.value)} /><input className="w-full p-5 bg-slate-50 rounded-2xl font-bold" type="password" placeholder="MOT DE PASSE" onChange={e => setP(e.target.value)} /><button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase" onClick={() => onLogin(u, p)}>Connexion</button><button className="w-full text-slate-400 text-[10px] font-black uppercase py-4" onClick={onGoToRegister}>Créer un accès</button></div></div></div>
+      );
+    }
+
+    function RegisterView({ onRegister, onGoToLogin }) {
+      const [form, setForm] = useState({ username: '', password: '', role: ROLES.PROF });
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md"><h2 className="text-4xl font-black uppercase mb-2 italic">Inscription</h2><div className="space-y-6 mt-10"><FormInput label="Nom Complet"><input className="p-4 bg-slate-50 rounded-2xl font-bold" onChange={e => setForm({...form, username: e.target.value})} /></FormInput><FormInput label="Mot de Passe"><input className="p-4 bg-slate-50 rounded-2xl font-bold" type="password" onChange={e => setForm({...form, password: e.target.value})} /></FormInput><FormInput label="Fonction"><select className="p-4 bg-white border-2 rounded-2xl font-bold" onChange={e => setForm({...form, role: e.target.value})}><option value={ROLES.PROF}>ENSEIGNANT</option><option value={ROLES.RESPONSABLE}>RESPONSABLE</option><option value={ROLES.DIRECTION}>DIRECTION</option></select></FormInput><button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase mt-8" onClick={() => onRegister(form)}>Soumettre</button><button className="w-full text-slate-400 text-[10px] font-black uppercase py-4" onClick={onGoToLogin}>Retour</button></div></div></div>
+      );
+    }
+
+    function AdminPasswordModal({ onConfirm, onCancel }) {
+      const [p, setP] = useState("");
+      return (
+        <div className="fixed inset-0 bg-slate-900/95 flex items-center justify-center p-6 z-[200]"><div className="bg-white p-12 rounded-[4rem] text-center max-w-sm w-full"><div className="bg-amber-100 text-amber-600 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8"><Lock className="text-4xl"/></div><h3 className="text-3xl font-black uppercase mb-8">Zone Privée</h3><input type="password" autoFocus className="w-full p-6 bg-slate-50 rounded-2xl text-center font-black tracking-[0.5em] text-2xl mb-8" placeholder="••••••••" onChange={e => setP(e.target.value)} onKeyDown={e => e.key === 'Enter' && onConfirm(p)} /><div className="grid grid-cols-2 gap-4"><button className="bg-slate-100 py-5 rounded-2xl font-black uppercase text-[10px]" onClick={onCancel}>Annuler</button><button className="bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase text-[10px]" onClick={() => onConfirm(p)}>Confirmer</button></div></div></div>
+      );
+    }
+
+    // --- LANCEMENT DE L'APPLICATION ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
